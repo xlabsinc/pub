@@ -16,7 +16,7 @@
     console.log('Button clicked! Fetching image...');
     
     // Make a GET request to the Google Apps Script Web App
-    fetch(`https://script.google.com/macros/s/AKfycbz3PwVx6LIhT77i4CRNQChZoib7EENsY2DZ3b9KdTl7AEoIGflyBF71QA7C-aiIts7_/exec`)
+    fetch(`https://script.google.com/macros/s/AKfycbxTlj9UFvB_qfeCO4U8mt1fan1TfG7Ggt3Wrrq2xCYYDVKctYJBAfs4LD6Si2_J_29W/exec`)
       .then(response => {
         console.log('Response received:', response);
         if (!response.ok) {
@@ -24,22 +24,16 @@
           alert('Failed to fetch the image. Please check the console for more details.');
           throw new Error('Failed to fetch image');
         }
-        return response.blob();  // Convert the response to a Blob (binary data)
+        return response.json();  // Convert the response to JSON
       })
-      .then(blob => {
-        console.log('Blob received:', blob);
-        // Check the blob type to ensure it is the correct image type
-        if (blob.type !== 'image/png') {
-          console.error('Unexpected file type:', blob.type);
-          alert('The fetched file is not a PNG image.');
-          return;
-        }
+      .then(data => {
+        console.log('Data received:', data);
 
         // Create a URL for the image blob
-        const imageUrl = URL.createObjectURL(blob);
+        const imageUrl = `data:${data.mimeType};base64,${data.imageString}`;
         console.log('Image URL created:', imageUrl);
 
-        // Set the src of the img element to the blob URL
+        // Set the src of the img element to the base64 string URL
         document.getElementById("image").src = imageUrl;
         console.log('Image displayed on the page.');
       })
@@ -52,4 +46,3 @@
 
 </body>
 </html>
-
