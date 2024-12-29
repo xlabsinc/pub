@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Display PNG from Google Drive</title>
+</head>
+<body>
+
+<h1>PNG Image from Google Drive</h1>
+<button id="loadImageButton">Load PNG Image</button>
+<img id="image" style="max-width: 100%; margin-top: 20px;" />
+
+<script>
+  document.getElementById("loadImageButton").addEventListener("click", function() {
+    // The ID of your PNG file in Google Drive
+    // Make a GET request to the Google Apps Script Web App with the fileId as a parameter
+    fetch(`https://script.google.com/macros/s/AKfycbxX9TJbN8C2GOjbhc-tuGn4VxFG1HxMy51UKC3vMVVwwJjhoTXjTW2Cz2oXE2xX8Wfo/exec`)
+      .then(response => response.blob())  // Convert the response to a Blob (binary data)
+      .then(blob => {
+        // Create a URL for the image blob
+        const imageUrl = URL.createObjectURL(blob);
+
+        // Set the src of the img element to the blob URL
+        document.getElementById("image").src = imageUrl;
+      })
+      .catch((error) => {
+        console.error('Error loading the image:', error);
+        alert('Error loading the image.');
+      });
+  });
+</script>
+
+</body>
+</html>
