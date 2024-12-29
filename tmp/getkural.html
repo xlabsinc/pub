@@ -13,23 +13,43 @@
 
 <script>
   document.getElementById("loadImageButton").addEventListener("click", function() {
-    // The ID of your PNG file in Google Drive
-    // Make a GET request to the Google Apps Script Web App with the fileId as a parameter
-    fetch(`https://script.google.com/macros/s/AKfycbytkZm0FKoeujSNoCgqRfd-z7MwRZTyF3PMVm9lahnMqgxktXOXy-pTtP2YAfPIGA-D/exec`)
-      .then(response => response.blob())  // Convert the response to a Blob (binary data)
+    console.log('Button clicked! Fetching image...');
+    
+    // Make a GET request to the Google Apps Script Web App
+    fetch(`https://script.google.com/macros/s/AKfycbz4PMpi4WjzriQDLkjzCAtWfCC0ijMnbTSmJL9plh2tsL55Jn9mKZ9Ji5L7EaPStoqw/exec`)
+      .then(response => {
+        console.log('Response received:', response);
+        if (!response.ok) {
+          console.error('Failed to fetch the image:', response.statusText);
+          alert('Failed to fetch the image. Please check the console for more details.');
+          throw new Error('Failed to fetch image');
+        }
+        return response.blob();  // Convert the response to a Blob (binary data)
+      })
       .then(blob => {
+        console.log('Blob received:', blob);
+        // Check the blob type to ensure it is the correct image type
+        if (blob.type !== 'image/png') {
+          console.error('Unexpected file type:', blob.type);
+          alert('The fetched file is not a PNG image.');
+          return;
+        }
+
         // Create a URL for the image blob
         const imageUrl = URL.createObjectURL(blob);
+        console.log('Image URL created:', imageUrl);
 
         // Set the src of the img element to the blob URL
         document.getElementById("image").src = imageUrl;
+        console.log('Image displayed on the page.');
       })
       .catch((error) => {
         console.error('Error loading the image:', error);
-        alert('Error loading the image.');
+        alert('Error loading the image. Please check the console for more details.');
       });
   });
 </script>
 
 </body>
 </html>
+
