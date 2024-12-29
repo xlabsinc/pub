@@ -15,7 +15,7 @@
   document.getElementById("loadImageButton").addEventListener("click", function() {
     // The ID of your PNG file in Google Drive
     // Make a GET request to the Google Apps Script Web App with the fileId as a parameter
-    fetch(`https://script.google.com/macros/s/AKfycbxX9TJbN8C2GOjbhc-tuGn4VxFG1HxMy51UKC3vMVVwwJjhoTXjTW2Cz2oXE2xX8Wfo/exec`)
+    fetch(`https://script.google.com/macros/s/AKfycbytkZm0FKoeujSNoCgqRfd-z7MwRZTyF3PMVm9lahnMqgxktXOXy-pTtP2YAfPIGA-D/exec`)
       .then(response => response.blob())  // Convert the response to a Blob (binary data)
       .then(blob => {
         // Create a URL for the image blob
