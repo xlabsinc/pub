@@ -8,16 +8,14 @@
 <body>
 
 <h1>PNG Image from Google Drive</h1>
-<button id="loadImageButton">Load PNG Image</button>
 <img id="image" style="max-width: 100%; margin-top: 20px;" />
 
 <script>
-  document.getElementById("loadImageButton").addEventListener("click", function() {
-    console.log('Button clicked! Fetching image...');
+  document.addEventListener("DOMContentLoaded", function() {
+    console.log('Page loaded! Fetching image...');
     
     // Make a GET request to the Google Apps Script Web App
-    fetch(`https://script.google.com/macros/s/AKfycbwhunVH8zFLI4tgQi9qEDjI4xleCR8dqpVS-RwyIbqj9g01rIIy-Zt8iC_ZNZmq-NJ2
-/exec`)
+    fetch(`https://script.google.com/macros/s/AKfycbwhunVH8zFLI4tgQi9qEDjI4xleCR8dqpVS-RwyIbqj9g01rIIy-Zt8iC_ZNZmq-NJ2/exec`)
       .then(response => {
         console.log('Response received:', response);
         if (!response.ok) {
