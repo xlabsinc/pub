@@ -8,7 +8,7 @@
 <body>
 
 <h1>PNG Image from Google Drive</h1>
-<img id="image" style="max-width: 100%; margin-top: 20px;" />
+<div id="imageContainer" style="max-width: 100%; margin-top: 20px;"></div>
 
 <script>
   document.addEventListener("DOMContentLoaded", function() {
@@ -23,17 +23,13 @@
           alert('Failed to fetch the image. Please check the console for more details.');
           throw new Error('Failed to fetch image');
         }
-        return response.json();  // Convert the response to JSON
+        return response.text();  // Convert the response to text (HTML content)
       })
-      .then(data => {
-        console.log('Data received:', data);
+      .then(html => {
+        console.log('HTML content received:', html);
 
-        // Create a URL for the image blob
-        const imageUrl = `data:${data.mimeType};base64,${data.imageString}`;
-        console.log('Image URL created:', imageUrl);
-
-        // Set the src of the img element to the base64 string URL
-        document.getElementById("image").src = imageUrl;
+        // Insert the HTML content into the imageContainer div
+        document.getElementById("imageContainer").innerHTML = html;
         console.log('Image displayed on the page.');
       })
       .catch((error) => {
