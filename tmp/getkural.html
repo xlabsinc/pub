@@ -15,7 +15,7 @@
     console.log('Page loaded! Fetching image...');
     
     // Make a GET request to the Google Apps Script Web App
-    fetch(`https://script.google.com/macros/s/AKfycbwhunVH8zFLI4tgQi9qEDjI4xleCR8dqpVS-RwyIbqj9g01rIIy-Zt8iC_ZNZmq-NJ2/exec`)
+    fetch(`https://script.google.com/macros/s/AKfycbw_WgNvhvRJt-KzOWgldb4Trzs6bdtOBB7eNvxt51QFHiqCTk33rGnGDKUV3G-P-GCn/exec`)
       .then(response => {
         console.log('Response received:', response);
         if (!response.ok) {
@@ -29,7 +29,7 @@
         console.log('Data received:', data);
 
         // Create a URL for the image blob
-        const imageUrl = `data:${data.mimeType};base64,${data.imageString}`;
+        const imageUrl = `data:${data.mimeType};base64,${data.k1}`;
         console.log('Image URL created:', imageUrl);
 
         // Set the src of the img element to the base64 string URL
