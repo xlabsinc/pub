@@ -1218,13 +1218,20 @@
 
                 if (schedule) {
                     const scheduleName = this._scheduleNames.get(schedule.scheduleId) || 'Unknown Schedule';
+                    const pacificTimeOptions = {
+                        timeZone: 'America/Los_Angeles',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: 'numeric',
+                        timeZoneName: 'short'
+                    };
                     this._modalContent.innerHTML = `
                         <h3>${schedule.person}</h3>
                         <p><strong>Schedule:</strong> ${scheduleName} (${schedule.scheduleId})</p>
-                        <p><strong>On-Call Time (UTC):</strong></p>
-                        <p>${new Date(schedule.fullStart).toUTCString()}</p>
-                        <p>to</p>
-                        <p>${new Date(schedule.fullEnd).toUTCString()}</p>
+                        <p><strong>From:</strong> ${new Date(schedule.fullStart).toLocaleString('en-US', pacificTimeOptions)}</p>
+                        <p><strong>To:</strong> ${new Date(schedule.fullEnd).toLocaleString('en-US', pacificTimeOptions)}</p>
                         <p><a href="${schedule.contactUrl}" target="_blank" rel="noopener noreferrer">Contact via PagerDuty</a></p>
                     `;
                     this._modal.style.display = 'block';
