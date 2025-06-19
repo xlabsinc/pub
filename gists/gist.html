@@ -78,6 +78,27 @@
             transition: border-color 0.3s, background-color 0.3s;
         }
 
+        .btn.btn-secondary {
+            background-color: #6c757d;
+        }
+
+        .btn.btn-danger {
+            background-color: #dc3545;
+        }
+
+        .btn.btn-info {
+            background-color: #17a2b8;
+            padding: 5px 10px;
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        .controls-group-right {
+            margin-left: auto;
+            display: flex;
+            gap: 10px;
+        }
+
         .input-group input:focus, .input-group select:focus {
             outline: none;
             border-color: #0366d6;
@@ -231,28 +252,151 @@
         }
 
         .gist-snippet-popup {
-            position: absolute;
+            position: fixed;
             display: none;
             background-color: #2d2d2d;
             color: #f1f1f1;
             border: 1px solid #ccc;
             border-radius: 6px;
-            padding: 10px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
             z-index: 1000;
             max-width: 600px;
             max-height: 400px;
-            overflow: auto;
             font-family: monospace;
             font-size: 12px;
+            flex-direction: column;
+            pointer-events: auto;
+            transition: border-color 0.3s ease;
+        }
+
+        .gist-snippet-popup.sticky {
+            border-color: #0366d6;
+            box-shadow: 0 8px 25px rgba(3, 102, 214, 0.3);
+        }
+
+        .gist-snippet-popup-header {
+            background-color: #3c3c3c;
+            padding: 5px 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #555;
+        }
+
+        .sticky-indicator {
+            font-size: 10px;
+            color: #0366d6;
+            font-weight: bold;
+        }
+
+        .gist-snippet-popup-header button {
+            background: #555;
+            color: white;
+            border: 1px solid #666;
+            border-radius: 4px;
+            padding: 3px 8px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 5px;
+        }
+
+        .gist-snippet-popup-header button:hover {
+            background: #666;
+        }
+
+        .gist-snippet-popup-content {
+            padding: 10px;
+            overflow: auto;
             white-space: pre-wrap;
         }
 
-        .gist-snippet-popup pre {
+        .gist-snippet-popup-content pre {
             margin: 0;
             padding: 0;
             white-space: pre-wrap;
             word-wrap: break-word;
+            user-select: text; /* Ensure text is selectable */
+        }
+
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1040;
+            display: none;
+        }
+
+        .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            z-index: 1050;
+            width: 90%;
+            max-width: 600px;
+            display: none;
+        }
+
+        .modal-header {
+            padding: 15px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            margin: 0;
+            font-size: 1.25rem;
+        }
+
+        .modal-body {
+            padding: 20px 25px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.7;
+            color: #333;
+        }
+
+        .modal-body p {
+            margin-bottom: 1em;
+        }
+
+        .modal-body ul {
+            list-style-type: disc;
+            padding-left: 20px;
+            margin-bottom: 1em;
+            margin-top: -1em;
+        }
+
+        .modal-body li {
+            margin-bottom: 0.5em;
+        }
+
+        .modal-body code {
+            background-color: #eef;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+            font-size: 0.9em;
+        }
+
+        .modal-footer {
+            padding: 15px;
+            border-top: 1px solid #e9ecef;
+            text-align: right;
+        }
+
+        .close-button {
+            border: none;
+            background: transparent;
+            font-size: 1.5rem;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -273,6 +417,11 @@
                     <option value="all">All</option>
                 </select>
                 <button id="getGistsBtn" class="btn">Get Gists</button>
+                <button id="clearBtn" class="btn btn-secondary">Clear</button>
+                <button id="resetBtn" class="btn btn-danger">Reset</button>
+            </div>
+            <div class="controls-group-right">
+                <button id="helpBtn" class="btn btn-info">?</button>
             </div>
             <div class="pat-input-container" id="patContainer">
                 <input type="password" id="githubToken" placeholder="GitHub Personal Access Token">
@@ -285,7 +434,36 @@
         </div>
     </div>
 
-    <div id="gistSnippetPopup" class="gist-snippet-popup"></div>
+    <div id="gistSnippetPopup" class="gist-snippet-popup">
+        <div class="gist-snippet-popup-header">
+            <span id="stickyIndicator" class="sticky-indicator" style="display: none;">STICKY</span>
+            <div>
+                <button id="copySnippetBtn">Copy</button>
+                <button id="closeSnippetBtn">Close</button>
+            </div>
+        </div>
+        <div id="gistSnippetContent" class="gist-snippet-popup-content"></div>
+    </div>
+
+    <div id="helpModalBackdrop" class="modal-backdrop"></div>
+    <div id="helpModal" class="modal">
+        <div class="modal-header">
+            <h5 class="modal-title">Gist Explorer Help</h5>
+            <button type="button" class="close-button" id="closeHelpModalBtn">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p><strong>Usernames:</strong> Enter one or more GitHub usernames, separated by commas.</p>
+            <p><strong>Gist Type:</strong> Select the type of gists to fetch.</p>
+            <ul>
+                <li><b>Public:</b> Only public gists.</li>
+                <li><b>Secret:</b> Only secret gists (requires a Personal Access Token).</li>
+                <li><b>All:</b> Both public and secret gists (requires a Personal Access Token).</li>
+            </ul>
+            <p><strong>URL Hash Parameter:</strong> You can load users directly via the URL.<br>
+                Example: <code>gist.html#nx=user1,user2</code>
+            </p>
+        </div>
+    </div>
 
 <script>
 // Generated by Copilot
@@ -295,16 +473,30 @@ document.addEventListener("DOMContentLoaded", () => {
     const kindSelect = getEl("gistKind");
     const tokenInput = getEl("githubToken");
     const getGistsBtn = getEl("getGistsBtn");
+    const clearBtn = getEl("clearBtn");
+    const resetBtn = getEl("resetBtn");
+    const helpBtn = getEl("helpBtn");
     const patContainer = getEl("patContainer");
     const resultsContainer = getEl("resultsContainer");
     const snippetPopup = getEl("gistSnippetPopup");
+    const snippetContent = getEl("gistSnippetContent");
+    const copySnippetBtn = getEl("copySnippetBtn");
+    const closeSnippetBtn = getEl("closeSnippetBtn");
+    const stickyIndicator = getEl("stickyIndicator");
+    const helpModal = getEl("helpModal");
+    const helpModalBackdrop = getEl("helpModalBackdrop");
+    const closeHelpModalBtn = getEl("closeHelpModalBtn");
     let allGists = [];
     let currentSort = { column: 'filename', direction: 'asc' };
     let fetchErrors = [];
     const snippetCache = {};
+    let snippetHideTimeout;
+    let snippetHoverTimer;
+    let isPopupSticky = false;
 
     const setCookie = (n, v, d) => { let e = new Date(); e.setTime(e.getTime() + (d * 24 * 60 * 60 * 1000)); document.cookie = `${n}=${encodeURIComponent(v)};expires=${e.toUTCString()};path=/`; };
     const getCookie = (n) => { const q = n + "="; const c = document.cookie.split(';'); for (let i = 0; i < c.length; i++) { let p = c[i].trim(); if (p.indexOf(q) === 0) return decodeURIComponent(p.substring(q.length, p.length)); } return null; };
+    const deleteCookie = (n) => { document.cookie = `${n}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`; };
 
     const loadSavedData = () => {
         const urlParams = new URLSearchParams(window.location.hash.substring(1));
@@ -314,7 +506,7 @@ document.addEventListener("DOMContentLoaded", () => {
             usernameInput.value = usersFromHash;
             fetchGists();
         } else {
-            usernameInput.value = getCookie('github_username') || 'xbalaji';
+            usernameInput.value = getCookie('github_username') || '';
         }
 
         kindSelect.value = getCookie('gist_kind') || 'public';
@@ -431,7 +623,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const isPublic = gist.public;
 
             return `
-                <tr class="${isPublic ? '' : 'private-gist'}">
+                <tr class="${isPublic ? '' : 'private-gist'}" data-raw-url="${rawUrl}">
                     <td>${index + 1}</td>
                     <td><a href="${gist.owner.html_url}" target="_blank">${gist.owner.login}</a></td>
                     <td class="snippet-trigger" data-raw-url="${rawUrl}"><a href="${viewUrl}" target="_blank">${fileName}</a></td>
@@ -476,26 +668,65 @@ document.addEventListener("DOMContentLoaded", () => {
 
         document.querySelectorAll('.snippet-trigger').forEach(el => {
             el.addEventListener('mouseenter', handleSnippetShow);
-            el.addEventListener('mouseleave', handleSnippetHide);
+            el.addEventListener('mouseleave', () => { 
+                if (!isPopupSticky) {
+                    snippetHideTimeout = setTimeout(handleSnippetHide, 300); 
+                }
+            });
             el.addEventListener('mousemove', (e) => {
-                snippetPopup.style.left = `${e.pageX + 15}px`;
-                snippetPopup.style.top = `${e.pageY + 15}px`;
+                if (!isPopupSticky) {
+                    const rect = el.getBoundingClientRect();
+                    const popupWidth = 600; // max-width of popup
+                    const popupHeight = 400; // max-height of popup
+                    
+                    let left = e.clientX + 15;
+                    let top = e.clientY + 15;
+                    
+                    // Prevent popup from going off-screen
+                    if (left + popupWidth > window.innerWidth) {
+                        left = e.clientX - popupWidth - 15;
+                    }
+                    if (top + popupHeight > window.innerHeight) {
+                        top = e.clientY - popupHeight - 15;
+                    }
+                    
+                    snippetPopup.style.left = `${left}px`;
+                    snippetPopup.style.top = `${top}px`;
+                }
+            });
+        });
+
+        // Add click event listeners to table rows for sticky functionality
+        document.querySelectorAll('tbody tr[data-raw-url]').forEach(row => {
+            row.addEventListener('click', (e) => {
+                // Don't trigger if clicking on links
+                if (e.target.tagName === 'A') return;
+                
+                const rawUrl = row.dataset.rawUrl;
+                if (!rawUrl || rawUrl === '#') return;
+                
+                // Show popup at center of screen when clicked
+                const centerX = window.innerWidth / 2 - 300; // 300 is half of popup width
+                const centerY = window.innerHeight / 2 - 200; // 200 is half of popup height
+                
+                snippetPopup.style.left = `${centerX}px`;
+                snippetPopup.style.top = `${centerY}px`;
+                snippetPopup.style.display = 'flex';
+                snippetContent.innerHTML = '<pre>Loading snippet...</pre>';
+                
+                // Make it sticky immediately
+                makePopupSticky();
+                
+                // Load the snippet content
+                loadSnippetContent(rawUrl);
             });
         });
     };
 
-    const handleSnippetShow = async (e) => {
-        const rawUrl = e.currentTarget.dataset.rawUrl;
-        if (!rawUrl || rawUrl === '#') return;
-
-        snippetPopup.style.left = `${e.pageX + 15}px`;
-        snippetPopup.style.top = `${e.pageY + 15}px`;
-        snippetPopup.style.display = 'block';
-        snippetPopup.innerHTML = '<pre>Loading snippet...</pre>';
-
+    const loadSnippetContent = async (rawUrl) => {
         try {
             if (snippetCache[rawUrl]) {
-                snippetPopup.innerHTML = snippetCache[rawUrl];
+                snippetContent.innerHTML = snippetCache[rawUrl];
                 return;
             }
 
@@ -505,14 +736,65 @@ document.addEventListener("DOMContentLoaded", () => {
             const snippet = text.split('\n').slice(0, 30).join('\n'); // Show first 30 lines
             const formattedSnippet = `<pre>${escapeHtml(snippet)}</pre>`;
             snippetCache[rawUrl] = formattedSnippet;
-            snippetPopup.innerHTML = formattedSnippet;
+            snippetContent.innerHTML = formattedSnippet;
         } catch (error) {
-            snippetPopup.innerHTML = `<pre>Error loading snippet: ${error.message}</pre>`;
+            snippetContent.innerHTML = `<pre>Error loading snippet: ${error.message}</pre>`;
         }
     };
 
+    const handleSnippetShow = async (e) => {
+        clearTimeout(snippetHideTimeout);
+        clearTimeout(snippetHoverTimer);
+        isPopupSticky = false; // Reset sticky state for new popup
+        snippetPopup.classList.remove('sticky');
+        stickyIndicator.style.display = 'none';
+        
+        const rawUrl = e.currentTarget.dataset.rawUrl;
+        if (!rawUrl || rawUrl === '#') return;
+
+        const popupWidth = 600; // max-width of popup
+        const popupHeight = 400; // max-height of popup
+        
+        let left = e.clientX + 15;
+        let top = e.clientY + 15;
+        
+        // Prevent popup from going off-screen
+        if (left + popupWidth > window.innerWidth) {
+            left = e.clientX - popupWidth - 15;
+        }
+        if (top + popupHeight > window.innerHeight) {
+            top = e.clientY - popupHeight - 15;
+        }
+        
+        snippetPopup.style.left = `${left}px`;
+        snippetPopup.style.top = `${top}px`;
+        snippetPopup.style.display = 'flex';
+        snippetContent.innerHTML = '<pre>Loading snippet...</pre>';
+
+        loadSnippetContent(rawUrl);
+    };
+
     const handleSnippetHide = () => {
-        snippetPopup.style.display = 'none';
+        if (!isPopupSticky) {
+            snippetPopup.style.display = 'none';
+            clearTimeout(snippetHoverTimer);
+            snippetPopup.classList.remove('sticky');
+            stickyIndicator.style.display = 'none';
+        }
+    };
+
+    const makePopupSticky = () => {
+        isPopupSticky = true;
+        snippetPopup.classList.add('sticky');
+        stickyIndicator.style.display = 'inline';
+        clearTimeout(snippetHoverTimer); // Clear the timer since we're now sticky
+    };
+
+    const unstickPopup = () => {
+        isPopupSticky = false;
+        snippetPopup.classList.remove('sticky');
+        stickyIndicator.style.display = 'none';
+        handleSnippetHide();
     };
 
     const escapeHtml = (unsafe) => {
@@ -524,8 +806,65 @@ document.addEventListener("DOMContentLoaded", () => {
             .replace(/'/g, "&#039;");
     };
 
+    const clearInputs = () => {
+        usernameInput.value = '';
+    };
+
+    const resetApp = () => {
+        clearInputs();
+        deleteCookie('github_username');
+        deleteCookie('gist_kind');
+        deleteCookie('github_token');
+        loadSavedData(); // Reload defaults
+    };
+
+    const showHelpModal = () => {
+        helpModal.style.display = 'block';
+        helpModalBackdrop.style.display = 'block';
+    };
+
+    const hideHelpModal = () => {
+        helpModal.style.display = 'none';
+        helpModalBackdrop.style.display = 'none';
+    };
+
     kindSelect.addEventListener('change', toggleTokenInput);
     getGistsBtn.addEventListener('click', fetchGists);
+    clearBtn.addEventListener('click', clearInputs);
+    resetBtn.addEventListener('click', resetApp);
+    helpBtn.addEventListener('click', showHelpModal);
+    closeHelpModalBtn.addEventListener('click', hideHelpModal);
+    helpModalBackdrop.addEventListener('click', hideHelpModal);
+
+    snippetPopup.addEventListener('mouseenter', () => {
+        clearTimeout(snippetHideTimeout);
+        clearTimeout(snippetHoverTimer);
+    });
+    
+    snippetPopup.addEventListener('mouseleave', () => {
+        clearTimeout(snippetHoverTimer);
+        if (!isPopupSticky) {
+            handleSnippetHide();
+        }
+    });
+
+    copySnippetBtn.addEventListener('click', () => {
+        const textToCopy = snippetContent.innerText;
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            copySnippetBtn.textContent = 'Copied!';
+            setTimeout(() => { copySnippetBtn.textContent = 'Copy'; }, 2000);
+        }).catch(err => {
+            console.error('Failed to copy: ', err);
+        });
+    });
+
+    closeSnippetBtn.addEventListener('click', () => {
+        if (isPopupSticky) {
+            unstickPopup();
+        } else {
+            handleSnippetHide();
+        }
+    });
 
     loadSavedData();
 });
