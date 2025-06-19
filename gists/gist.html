@@ -260,13 +260,15 @@
             border-radius: 6px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
             z-index: 1000;
-            max-width: 600px;
-            max-height: 400px;
+            width: 600px;
+            height: 400px;
             font-family: monospace;
             font-size: 12px;
             flex-direction: column;
             pointer-events: auto;
             transition: border-color 0.3s ease;
+            resize: both;
+            overflow: hidden;
         }
 
         .gist-snippet-popup.sticky {
@@ -274,19 +276,123 @@
             box-shadow: 0 8px 25px rgba(3, 102, 214, 0.3);
         }
 
+        .gist-snippet-popup.minimized {
+            width: 250px;
+            height: 40px;
+            bottom: 10px;
+            top: auto;
+            resize: none;
+        }
+
         .gist-snippet-popup-header {
             background-color: #3c3c3c;
-            padding: 5px 10px;
+            padding: 8px 12px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid #555;
+            cursor: move;
+            user-select: none;
+        }
+
+        .popup-title {
+            flex-grow: 1;
+            text-align: center;
+            font-weight: bold;
+            font-size: 13px;
+            color: #f1f1f1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin: 0 10px;
+        }
+
+        .popup-controls-left, .popup-controls-right {
+            display: flex;
+            gap: 5px;
+        }
+
+        .popup-control-btn {
+            background: #555;
+            color: white;
+            border: 1px solid #666;
+            border-radius: 3px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 24px;
+            height: 24px;
+        }
+
+        .popup-control-btn:hover {
+            background: #666;
+        }
+
+        .popup-control-btn.copy-btn {
+            background: #28a745;
+        }
+
+        .popup-control-btn.copy-btn:hover {
+            background: #218838;
+        }
+
+        .popup-control-btn.minimize-btn {
+            background: #ffc107;
+            color: #000;
+        }
+
+        .popup-control-btn.minimize-btn:hover {
+            background: #e0a800;
+        }
+
+        .popup-control-btn.close-btn {
+            background: #dc3545;
+        }
+
+        .popup-control-btn.close-btn:hover {
+            background: #c82333;
         }
 
         .sticky-indicator {
             font-size: 10px;
             color: #0366d6;
             font-weight: bold;
+        }
+
+        .minimized-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 50px;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            padding: 0 20px;
+            z-index: 999;
+        }
+
+        .minimized-item {
+            background: #3c3c3c;
+            color: #f1f1f1;
+            padding: 8px 15px;
+            margin-right: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            border: 1px solid #555;
+            white-space: nowrap;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .minimized-item:hover {
+            background: #4c4c4c;
+            border-color: #777;
         }
 
         .gist-snippet-popup-header button {
@@ -308,6 +414,11 @@
             padding: 10px;
             overflow: auto;
             white-space: pre-wrap;
+            flex: 1;
+        }
+
+        .gist-snippet-popup-content.minimized {
+            display: none;
         }
 
         .gist-snippet-popup-content pre {
@@ -436,14 +547,20 @@
 
     <div id="gistSnippetPopup" class="gist-snippet-popup">
         <div class="gist-snippet-popup-header">
-            <span id="stickyIndicator" class="sticky-indicator" style="display: none;">STICKY</span>
-            <div>
-                <button id="copySnippetBtn">Copy</button>
-                <button id="closeSnippetBtn">Close</button>
+            <div class="popup-controls-left">
+                <button class="popup-control-btn copy-btn" id="copySnippetBtn" title="Copy">📋</button>
+            </div>
+            <div class="popup-title" id="popupTitle">Gist Preview</div>
+            <div class="popup-controls-right">
+                <span id="stickyIndicator" class="sticky-indicator" style="display: none;">STICKY</span>
+                <button class="popup-control-btn minimize-btn" id="minimizeBtn" title="Minimize">−</button>
+                <button class="popup-control-btn close-btn" id="closeSnippetBtn" title="Close">×</button>
             </div>
         </div>
         <div id="gistSnippetContent" class="gist-snippet-popup-content"></div>
     </div>
+
+    <div id="minimizedBar" class="minimized-bar"></div>
 
     <div id="helpModalBackdrop" class="modal-backdrop"></div>
     <div id="helpModal" class="modal">
@@ -482,7 +599,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const snippetContent = getEl("gistSnippetContent");
     const copySnippetBtn = getEl("copySnippetBtn");
     const closeSnippetBtn = getEl("closeSnippetBtn");
+    const minimizeBtn = getEl("minimizeBtn");
     const stickyIndicator = getEl("stickyIndicator");
+    const popupTitle = getEl("popupTitle");
+    const minimizedBar = getEl("minimizedBar");
     const helpModal = getEl("helpModal");
     const helpModalBackdrop = getEl("helpModalBackdrop");
     const closeHelpModalBtn = getEl("closeHelpModalBtn");
@@ -493,6 +613,9 @@ document.addEventListener("DOMContentLoaded", () => {
     let snippetHideTimeout;
     let snippetHoverTimer;
     let isPopupSticky = false;
+    let isPopupMinimized = false;
+    let currentGistData = null;
+    let minimizedPopups = new Map(); // Store minimized popups
 
     const setCookie = (n, v, d) => { let e = new Date(); e.setTime(e.getTime() + (d * 24 * 60 * 60 * 1000)); document.cookie = `${n}=${encodeURIComponent(v)};expires=${e.toUTCString()};path=/`; };
     const getCookie = (n) => { const q = n + "="; const c = document.cookie.split(';'); for (let i = 0; i < c.length; i++) { let p = c[i].trim(); if (p.indexOf(q) === 0) return decodeURIComponent(p.substring(q.length, p.length)); } return null; };
@@ -705,22 +828,106 @@ document.addEventListener("DOMContentLoaded", () => {
                 const rawUrl = row.dataset.rawUrl;
                 if (!rawUrl || rawUrl === '#') return;
                 
-                // Show popup at center of screen when clicked
-                const centerX = window.innerWidth / 2 - 300; // 300 is half of popup width
-                const centerY = window.innerHeight / 2 - 200; // 200 is half of popup height
+                // Get gist data for this row
+                const index = Array.from(row.parentNode.children).indexOf(row);
+                const gist = allGists[index];
+                const fileName = Object.keys(gist.files)[0] || 'N/A';
                 
-                snippetPopup.style.left = `${centerX}px`;
-                snippetPopup.style.top = `${centerY}px`;
-                snippetPopup.style.display = 'flex';
-                snippetContent.innerHTML = '<pre>Loading snippet...</pre>';
-                
-                // Make it sticky immediately
-                makePopupSticky();
-                
-                // Load the snippet content
-                loadSnippetContent(rawUrl);
+                showStickyPopup(rawUrl, fileName, gist);
             });
         });
+    };
+
+    const showStickyPopup = (rawUrl, fileName, gist) => {
+        // Show popup at center of screen when clicked
+        const centerX = window.innerWidth / 2 - 300; // 300 is half of popup width
+        const centerY = window.innerHeight / 2 - 200; // 200 is half of popup height
+        
+        snippetPopup.style.left = `${centerX}px`;
+        snippetPopup.style.top = `${centerY}px`;
+        snippetPopup.style.display = 'flex';
+        snippetPopup.classList.remove('minimized');
+        snippetContent.classList.remove('minimized');
+        snippetContent.innerHTML = '<pre>Loading snippet...</pre>';
+        
+        // Set title
+        popupTitle.textContent = fileName;
+        currentGistData = { rawUrl, fileName, gist };
+        
+        // Make it sticky immediately
+        makePopupSticky();
+        
+        // Load the snippet content
+        loadSnippetContent(rawUrl);
+    };
+
+    const minimizePopup = () => {
+        if (!currentGistData) return;
+        
+        // Store current popup state
+        const popupId = currentGistData.rawUrl;
+        minimizedPopups.set(popupId, {
+            fileName: currentGistData.fileName,
+            gist: currentGistData.gist,
+            content: snippetContent.innerHTML
+        });
+        
+        // Update minimized bar
+        updateMinimizedBar();
+        
+        // Hide main popup
+        snippetPopup.style.display = 'none';
+        isPopupMinimized = false;
+        isPopupSticky = false;
+        currentGistData = null;
+    };
+
+    const updateMinimizedBar = () => {
+        if (minimizedPopups.size === 0) {
+            minimizedBar.style.display = 'none';
+            return;
+        }
+        
+        minimizedBar.style.display = 'flex';
+        minimizedBar.innerHTML = '';
+        
+        minimizedPopups.forEach((data, popupId) => {
+            const item = document.createElement('div');
+            item.className = 'minimized-item';
+            item.textContent = data.fileName;
+            item.title = `${data.fileName} - Click to restore`;
+            
+            item.addEventListener('click', () => {
+                restorePopup(popupId);
+            });
+            
+            minimizedBar.appendChild(item);
+        });
+    };
+
+    const restorePopup = (popupId) => {
+        const data = minimizedPopups.get(popupId);
+        if (!data) return;
+        
+        // Restore popup
+        const centerX = window.innerWidth / 2 - 300;
+        const centerY = window.innerHeight / 2 - 200;
+        
+        snippetPopup.style.left = `${centerX}px`;
+        snippetPopup.style.top = `${centerY}px`;
+        snippetPopup.style.display = 'flex';
+        snippetPopup.classList.remove('minimized');
+        snippetContent.classList.remove('minimized');
+        
+        popupTitle.textContent = data.fileName;
+        snippetContent.innerHTML = data.content;
+        currentGistData = { rawUrl: popupId, fileName: data.fileName, gist: data.gist };
+        
+        makePopupSticky();
+        
+        // Remove from minimized
+        minimizedPopups.delete(popupId);
+        updateMinimizedBar();
     };
 
     const loadSnippetContent = async (rawUrl) => {
@@ -743,17 +950,17 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const handleSnippetShow = async (e) => {
+        // Only show hover popup if no sticky popup is active
+        if (isPopupSticky || minimizedPopups.size > 0) return;
+        
         clearTimeout(snippetHideTimeout);
         clearTimeout(snippetHoverTimer);
-        isPopupSticky = false; // Reset sticky state for new popup
-        snippetPopup.classList.remove('sticky');
-        stickyIndicator.style.display = 'none';
         
         const rawUrl = e.currentTarget.dataset.rawUrl;
         if (!rawUrl || rawUrl === '#') return;
 
-        const popupWidth = 600; // max-width of popup
-        const popupHeight = 400; // max-height of popup
+        const popupWidth = 600;
+        const popupHeight = 400;
         
         let left = e.clientX + 15;
         let top = e.clientY + 15;
@@ -769,17 +976,22 @@ document.addEventListener("DOMContentLoaded", () => {
         snippetPopup.style.left = `${left}px`;
         snippetPopup.style.top = `${top}px`;
         snippetPopup.style.display = 'flex';
+        snippetPopup.classList.remove('minimized');
+        snippetContent.classList.remove('minimized');
         snippetContent.innerHTML = '<pre>Loading snippet...</pre>';
+        
+        // Set title for hover popup
+        const fileName = e.currentTarget.textContent.trim();
+        popupTitle.textContent = fileName;
 
         loadSnippetContent(rawUrl);
     };
 
     const handleSnippetHide = () => {
-        if (!isPopupSticky) {
+        if (!isPopupSticky && !isPopupMinimized) {
             snippetPopup.style.display = 'none';
             clearTimeout(snippetHoverTimer);
-            snippetPopup.classList.remove('sticky');
-            stickyIndicator.style.display = 'none';
+            currentGistData = null;
         }
     };
 
@@ -792,9 +1004,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const unstickPopup = () => {
         isPopupSticky = false;
+        isPopupMinimized = false;
         snippetPopup.classList.remove('sticky');
         stickyIndicator.style.display = 'none';
-        handleSnippetHide();
+        snippetPopup.style.display = 'none';
+        currentGistData = null;
     };
 
     const escapeHtml = (unsafe) => {
@@ -848,11 +1062,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    minimizeBtn.addEventListener('click', minimizePopup);
+
     copySnippetBtn.addEventListener('click', () => {
         const textToCopy = snippetContent.innerText;
         navigator.clipboard.writeText(textToCopy).then(() => {
-            copySnippetBtn.textContent = 'Copied!';
-            setTimeout(() => { copySnippetBtn.textContent = 'Copy'; }, 2000);
+            copySnippetBtn.textContent = '✓';
+            setTimeout(() => { copySnippetBtn.textContent = '📋'; }, 2000);
         }).catch(err => {
             console.error('Failed to copy: ', err);
         });
