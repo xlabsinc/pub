@@ -122,44 +122,8 @@
         /* Maximize username input width to occupy available space */
         #githubUsername {
             flex: 2;
-            min-width: 500px;
+            min-width: 750px;
             max-width: none;
-        }
-
-        /* Snippet view radio button styles */
-        .snippet-view-group {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 12px;
-            background: #f8f9fa;
-            border: 2px solid #e9ecef;
-            border-radius: 6px;
-            font-size: 14px;
-        }
-
-        .snippet-view-label {
-            font-weight: 600;
-            color: #495057;
-            margin: 0;
-        }
-
-        .radio-option {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            cursor: pointer;
-            margin: 0;
-        }
-
-        .radio-option input[type="radio"] {
-            margin: 0;
-            cursor: pointer;
-        }
-
-        .radio-option span {
-            color: #495057;
-            font-size: 14px;
         }
 
         .pat-input-container {
@@ -780,17 +744,6 @@
                         <option value="all">All</option>
                     </select>
                     <button id="getGistsBtn" class="btn">Get Gists</button>
-                    <div class="snippet-view-group">
-                        <label class="snippet-view-label">Snippet View:</label>
-                        <label class="radio-option">
-                            <input type="radio" id="snippetViewYes" name="snippetView" value="yes">
-                            <span>Yes</span>
-                        </label>
-                        <label class="radio-option">
-                            <input type="radio" id="snippetViewNo" name="snippetView" value="no" checked>
-                            <span>No</span>
-                        </label>
-                    </div>
                     <button id="clearBtn" class="btn btn-secondary">Clear</button>
                     <button id="resetBtn" class="btn btn-danger">Reset</button>
                 </div>
@@ -881,18 +834,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const closeHelpModalBtn = getEl("closeHelpModalBtn");
     const minimizeHelpModalBtn = getEl("minimizeHelpModalBtn");
     const helpModalHeader = getEl("helpModalHeader");
-    const snippetViewYes = getEl("snippetViewYes");
-    const snippetViewNo = getEl("snippetViewNo");
     let allGists = [];
     let currentSort = { column: 'filename', direction: 'asc' };
     let fetchErrors = [];
     let fetchWarnings = [];
     const snippetCache = {};
-    let snippetHideTimeout;
-    let snippetHoverTimer;
     let activePopups = new Map(); // Store active popups
     let popupCounter = 0; // For unique popup IDs
-    let hoverPopup = null; // Current hover popup
     let dragData = null; // For dragging functionality
     let highestZIndex = 1000; // Track highest z-index for proper layering
     let autoFetchTimer = null; // Timer for auto-fetching gists
@@ -1222,38 +1170,26 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
 
-        // Conditionally add snippet triggers based on radio button
-        if (snippetViewYes.checked) {
-            document.querySelectorAll('.snippet-trigger').forEach(el => {
-                el.addEventListener('mouseenter', handleSnippetShow);
-                el.addEventListener('mouseleave', () => {
-                    snippetHideTimeout = setTimeout(handleSnippetHide, 300);
-                });
-                el.addEventListener('mousemove', (e) => {
-                    if (hoverPopup) {
-                        const popupData = activePopups.get(hoverPopup);
-                        if (popupData && !popupData.isSticky && !dragData) {
-                            const popupWidth = 600;
-                            const popupHeight = 400;
+        // Add click event listeners to snippet triggers for popup functionality
+        document.querySelectorAll('.snippet-trigger').forEach(el => {
+            el.addEventListener('click', (e) => {
+                // Don't trigger if clicking on links
+                if (e.target.tagName === 'A') return;
+                
+                e.preventDefault();
+                e.stopPropagation();
 
-                            let left = e.clientX + 15;
-                            let top = e.clientY + 15;
+                const rawUrl = el.dataset.rawUrl;
+                if (!rawUrl || rawUrl === '#') return;
 
-                            // Prevent popup from going off-screen
-                            if (left + popupWidth > window.innerWidth) {
-                                left = e.clientX - popupWidth - 15;
-                            }
-                            if (top + popupHeight > window.innerHeight) {
-                                top = e.clientY - popupHeight - 15;
-                            }
+                // Get gist data for this element
+                const gistIndex = parseInt(el.dataset.gistIndex);
+                const gist = allGists[gistIndex];
+                const fileName = gist ? Object.keys(gist.files)[0] || 'N/A' : 'N/A';
 
-                            popupData.element.style.left = `${left}px`;
-                            popupData.element.style.top = `${top}px`;
-                        }
-                    }
-                });
+                showStickyPopup(rawUrl, fileName, gist);
             });
-        }
+        });
 
         // Add click event listeners to table rows for sticky functionality
         document.querySelectorAll('tbody tr[data-raw-url]').forEach(row => {
@@ -1425,18 +1361,6 @@ document.addEventListener("DOMContentLoaded", () => {
         // Make popup focusable so it can receive keyboard events
         popup.setAttribute('tabindex', '0');
 
-        if (!isSticky) {
-            popup.addEventListener('mouseenter', () => {
-                clearTimeout(snippetHideTimeout);
-            });
-
-            popup.addEventListener('mouseleave', () => {
-                if (!popupData.isSticky) {
-                    snippetHideTimeout = setTimeout(() => closePopup(popupId), 300);
-                }
-            });
-        }
-
         // Load content
         loadSnippetContent(rawUrl, content);
 
@@ -1466,44 +1390,17 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        // Check if there's a hover popup for the same content to convert
-        const hoverPopupData = hoverPopup ? activePopups.get(hoverPopup) : null;
-        let useCurrentPosition = false;
-        let currentLeft = 0;
-        let currentTop = 0;
-
-        if (hoverPopupData && hoverPopupData.rawUrl === rawUrl && !hoverPopupData.isSticky) {
-            // Get current position before closing hover popup
-            const rect = hoverPopupData.element.getBoundingClientRect();
-            currentLeft = rect.left;
-            currentTop = rect.top;
-            useCurrentPosition = true;
-
-            // Close the hover popup
-            closePopup(hoverPopup);
-            hoverPopup = null;
-        }
-
         const popupId = createPopup(rawUrl, fileName, gist, true);
         const popupData = activePopups.get(popupId);
 
-        if (useCurrentPosition) {
-            // Keep the popup in the same location as the hover popup
-            popupData.element.style.left = `${currentLeft}px`;
-            popupData.element.style.top = `${currentTop}px`;
-            // Store initial position
-            popupData.lastPosition.left = currentLeft;
-            popupData.lastPosition.top = currentTop;
-        } else {
-            // Use smart auto-positioning instead of simple cascade
-            const position = getSmartPopupPosition();
+        // Use smart auto-positioning
+        const position = getSmartPopupPosition();
 
-            popupData.element.style.left = `${position.x}px`;
-            popupData.element.style.top = `${position.y}px`;
-            // Store initial position
-            popupData.lastPosition.left = position.x;
-            popupData.lastPosition.top = position.y;
-        }
+        popupData.element.style.left = `${position.x}px`;
+        popupData.element.style.top = `${position.y}px`;
+        // Store initial position
+        popupData.lastPosition.left = position.x;
+        popupData.lastPosition.top = position.y;
 
         popupData.element.style.display = 'flex';
         popupData.element.style.zIndex = getNextZIndex();
@@ -1625,77 +1522,6 @@ document.addEventListener("DOMContentLoaded", () => {
             contentElement.innerHTML = formattedSnippet;
         } catch (error) {
             contentElement.innerHTML = `<pre>Error loading snippet: ${error.message}</pre>`;
-        }
-    };
-
-    const handleSnippetShow = async (e) => {
-        // Allow hover popup even when sticky popups exist
-        clearTimeout(snippetHideTimeout);
-        clearTimeout(snippetHoverTimer);
-
-        const rawUrl = e.currentTarget.dataset.rawUrl;
-        if (!rawUrl || rawUrl === '#') return;
-
-        // Close existing hover popup
-        if (hoverPopup) {
-            closePopup(hoverPopup);
-            hoverPopup = null;
-        }
-
-        // Get gist data for proper title formatting
-        const gistIndex = parseInt(e.currentTarget.dataset.gistIndex);
-        const gist = allGists[gistIndex];
-
-        // Get actual filename from gist data instead of cell text
-        const fileName = gist ? Object.keys(gist.files)[0] || 'N/A' : e.currentTarget.textContent.trim();
-
-        hoverPopup = createPopup(rawUrl, fileName, gist, false);
-        const popupData = activePopups.get(hoverPopup);
-
-        const popupWidth = 600;
-        const popupHeight = 400;
-
-        // Try mouse-based positioning first, then smart positioning if conflicts
-        let left = e.clientX + 15;
-        let top = e.clientY + 15;
-
-        // Prevent popup from going off-screen
-        if (left + popupWidth > window.innerWidth) {
-            left = e.clientX - popupWidth - 15;
-        }
-        if (top + popupHeight > window.innerHeight) {
-            top = e.clientY - popupHeight - 15;
-        }
-
-        // Check if this position would overlap with existing popups
-        const existingPopups = Array.from(activePopups.values()).filter(p => p !== popupData && !p.isMinimized);
-        const wouldOverlap = existingPopups.some(existing => {
-            const rect = existing.element.getBoundingClientRect();
-            const overlapX = left < rect.right && left + popupWidth > rect.left;
-            const overlapY = top < rect.bottom && top + popupHeight > rect.top;
-            return overlapX && overlapY;
-        });
-
-        // If mouse-based position would overlap, use smart positioning
-        if (wouldOverlap) {
-            const smartPosition = getSmartPopupPosition();
-            left = smartPosition.x;
-            top = smartPosition.y;
-        }
-
-        popupData.element.style.left = `${left}px`;
-        popupData.element.style.top = `${top}px`;
-        popupData.element.style.display = 'flex';
-        popupData.element.style.zIndex = getNextZIndex(); // Always on top
-        // Store initial position for hover popups too
-        popupData.lastPosition.left = left;
-        popupData.lastPosition.top = top;
-    };
-
-    const handleSnippetHide = () => {
-        if (hoverPopup) {
-            closePopup(hoverPopup);
-            hoverPopup = null;
         }
     };
 
@@ -2193,32 +2019,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 autoFetchTimer = null;
             }, 2000); // 2 seconds delay for better responsiveness
         }
-    });
-
-    // Handle snippet view radio button changes
-    const handleSnippetViewChange = () => {
-        // Close all hover popups when disabling snippet view
-        if (snippetViewNo.checked && hoverPopup) {
-            closePopup(hoverPopup);
-            hoverPopup = null;
-        }
-        // Re-render the gists to update event listeners
-        if (allGists.length > 0) {
-            displayGists();
-        }
-    };
-
-    snippetViewYes.addEventListener('change', handleSnippetViewChange);
-    snippetViewNo.addEventListener('change', handleSnippetViewChange);
-
-    snippetPopup.addEventListener('mouseenter', () => {
-        clearTimeout(snippetHideTimeout);
-        clearTimeout(snippetHoverTimer);
-    });
-
-    snippetPopup.addEventListener('mouseleave', () => {
-        clearTimeout(snippetHoverTimer);
-        handleSnippetHide();
     });
 
     copySnippetBtn.addEventListener('click', () => {
