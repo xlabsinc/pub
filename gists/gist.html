@@ -122,7 +122,7 @@
         /* Maximize username input width to occupy available space */
         #githubUsername {
             flex: 2;
-            min-width: 750px;
+            min-width: 650px;
             max-width: none;
         }
 
@@ -724,6 +724,203 @@
             outline: none;
             box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
         }
+
+        /* Filter Modal Styles */
+        .filter-modal {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            width: 90%;
+            max-width: 800px;
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .filter-modal-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: move;
+            user-select: none;
+            background-color: #f8f9fa;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .filter-modal-header.dragging {
+            cursor: grabbing;
+            background-color: rgba(0, 123, 255, 0.1);
+        }
+
+        .filter-modal-title {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .filter-modal-body {
+            padding: 20px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .filter-row {
+            display: grid;
+            grid-template-columns: 1fr 150px 1fr auto;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+
+        .filter-row select,
+        .filter-row input {
+            padding: 8px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .filter-row select:focus,
+        .filter-row input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .filter-remove-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 36px;
+        }
+
+        .filter-remove-btn:hover {
+            background: #c82333;
+        }
+
+        .filter-remove-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .filter-add-row-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .filter-add-row-btn:hover {
+            background: #218838;
+        }
+
+        .filter-modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #e9ecef;
+            text-align: right;
+            background-color: #f8f9fa;
+            border-radius: 0 0 8px 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .filter-status {
+            color: #6c757d;
+            font-size: 14px;
+        }
+
+        .filter-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .filter-apply-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .filter-apply-btn:hover {
+            background: #0056b3;
+        }
+
+        .filter-clear-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .filter-clear-btn:hover {
+            background: #545b62;
+        }
+
+        .filter-close-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .filter-close-btn:hover {
+            background: #c82333;
+        }
+
+        /* Filter indicator */
+        .filter-indicator {
+            display: none;
+            background: #ffc107;
+            color: #856404;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-left: 10px;
+            font-weight: 600;
+        }
+
+        .filter-indicator.active {
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
@@ -744,10 +941,12 @@
                         <option value="all">All</option>
                     </select>
                     <button id="getGistsBtn" class="btn">Get Gists</button>
+                    <button id="filterBtn" class="btn btn-secondary">Filter</button>
                     <button id="clearBtn" class="btn btn-secondary">Clear</button>
                     <button id="resetBtn" class="btn btn-danger">Reset</button>
                 </div>
                 <div class="controls-group-right">
+                    <span id="filterIndicator" class="filter-indicator">Filtered</span>
                     <button id="helpBtn" class="btn btn-info">?</button>
                 </div>
                 <div class="pat-input-container" id="patContainer">
@@ -784,6 +983,31 @@
 
     <div id="minimizedBar" class="minimized-bar"></div>
 
+    <div id="filterModalBackdrop" class="modal-backdrop"></div>
+    <div id="filterModal" class="filter-modal">
+        <div class="filter-modal-header draggable-header" id="filterModalHeader">
+            <h5 class="filter-modal-title">Filter Configuration</h5>
+            <div class="modal-controls">
+                <button type="button" class="modal-control-btn minimize-modal-btn" id="minimizeFilterModalBtn" title="Minimize">−</button>
+                <button type="button" class="modal-control-btn close-button" id="closeFilterModalBtn" title="Close">&times;</button>
+            </div>
+        </div>
+        <div class="filter-modal-body">
+            <button class="filter-add-row-btn" id="addFilterRowBtn">
+                <span>+</span> Add Filter Rule
+            </button>
+            <div id="filterRows"></div>
+        </div>
+        <div class="filter-modal-footer">
+            <div class="filter-status" id="filterStatus">No filters applied</div>
+            <div class="filter-controls">
+                <button class="filter-clear-btn" id="clearFiltersBtn">Clear All</button>
+                <button class="filter-apply-btn" id="applyFiltersBtn">Apply Filters</button>
+                <button class="filter-close-btn" id="closeFilterBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
     <div id="helpModalBackdrop" class="modal-backdrop"></div>
     <div id="helpModal" class="modal">
         <div class="modal-header draggable-header" id="helpModalHeader">
@@ -813,9 +1037,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const usernameInput = getEl("githubUsername");
     const kindSelect = getEl("gistKind");
     const getGistsBtn = getEl("getGistsBtn");
+    const filterBtn = getEl("filterBtn");
     const clearBtn = getEl("clearBtn");
     const resetBtn = getEl("resetBtn");
     const helpBtn = getEl("helpBtn");
+    const filterIndicator = getEl("filterIndicator");
     const patContainer = getEl("patContainer");
     const patHeader = getEl("patHeader");
     const patContent = getEl("patContent");
@@ -834,7 +1060,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const closeHelpModalBtn = getEl("closeHelpModalBtn");
     const minimizeHelpModalBtn = getEl("minimizeHelpModalBtn");
     const helpModalHeader = getEl("helpModalHeader");
+    // Filter modal elements
+    const filterModal = getEl("filterModal");
+    const filterModalBackdrop = getEl("filterModalBackdrop");
+    const filterModalHeader = getEl("filterModalHeader");
+    const addFilterRowBtn = getEl("addFilterRowBtn");
+    const filterRows = getEl("filterRows");
+    const filterStatus = getEl("filterStatus");
+    const clearFiltersBtn = getEl("clearFiltersBtn");
+    const applyFiltersBtn = getEl("applyFiltersBtn");
+    const closeFilterBtn = getEl("closeFilterBtn");
+    const closeFilterModalBtn = getEl("closeFilterModalBtn");
+    const minimizeFilterModalBtn = getEl("minimizeFilterModalBtn");
     let allGists = [];
+    let filteredGists = []; // Generated by Copilot - Store filtered results
     let currentSort = { column: 'filename', direction: 'asc' };
     let fetchErrors = [];
     let fetchWarnings = [];
@@ -847,6 +1086,11 @@ document.addEventListener("DOMContentLoaded", () => {
     let patCollapsed = false; // Track PAT section collapsed state
     let helpModalDragData = null; // Help modal drag data
     let helpModalMinimized = false; // Help modal minimized state
+    // Generated by Copilot - Filter system variables
+    let filterRules = []; // Store active filter rules
+    let filterModalDragData = null; // Filter modal drag data
+    let filterModalMinimized = false; // Filter modal minimized state
+    let filterRowCounter = 0; // For unique filter row IDs
 
     // Function to get next z-index for proper layering
     const getNextZIndex = () => {
@@ -1066,10 +1310,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         }
                     }
                 });
-            }
-
-            allGists = allFetchedGists;
-            displayGists();
+            }        allGists = allFetchedGists;
+        filteredGists = allGists; // Generated by Copilot - Initialize filtered gists
+        displayGists();
 
         } catch (error) {
             resultsContainer.innerHTML = `<div class="error-message">An unexpected error occurred: ${error.message}</div>`;
@@ -1078,11 +1321,217 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
+    // Generated by Copilot - Filter system functions
+    const createFilterRow = () => {
+        const rowId = `filter-row-${++filterRowCounter}`;
+        const row = document.createElement('div');
+        row.className = 'filter-row';
+        row.id = rowId;
+
+        row.innerHTML = `
+            <select class="filter-field">
+                <option value="owner">Owner</option>
+                <option value="filename">Filename</option>
+                <option value="visibility">Visibility</option>
+            </select>
+            <select class="filter-operator">
+                <option value="contains">Contains</option>
+                <option value="not-contains">Doesn't Contain</option>
+            </select>
+            <input type="text" class="filter-value" placeholder="Enter text (supports wildcards: * and ?)">
+            <div class="filter-actions">
+                <button type="button" class="filter-remove-btn" title="Remove this filter">×</button>
+            </div>
+        `;
+
+        // Add remove functionality
+        const removeBtn = row.querySelector('.filter-remove-btn');
+        removeBtn.addEventListener('click', () => {
+            row.remove();
+            updateFilterStatus();
+        });
+
+        return row;
+    };
+
+    const addFilterRow = () => {
+        const row = createFilterRow();
+        filterRows.appendChild(row);
+        updateFilterStatus();
+    };
+
+    const clearAllFilters = () => {
+        filterRows.innerHTML = '';
+        filterRowCounter = 0;
+        updateFilterStatus();
+    };
+
+    const updateFilterStatus = () => {
+        const rowCount = filterRows.children.length;
+        filterStatus.textContent = rowCount === 0 ? 'No filters applied' : 
+            `${rowCount} filter rule${rowCount === 1 ? '' : 's'} configured`;
+    };
+
+    const getFilterRules = () => {
+        const rules = [];
+        const rows = filterRows.querySelectorAll('.filter-row');
+        
+        rows.forEach(row => {
+            const field = row.querySelector('.filter-field').value;
+            const operator = row.querySelector('.filter-operator').value;
+            const value = row.querySelector('.filter-value').value.trim();
+            
+            if (value) {
+                rules.push({ field, operator, value });
+            }
+        });
+        
+        return rules;
+    };
+
+    const wildcardToRegex = (pattern) => {
+        // Escape special regex characters except * and ?
+        const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+        // Convert wildcards to regex
+        const regex = escaped.replace(/\*/g, '.*').replace(/\?/g, '.');
+        return new RegExp(regex, 'i'); // Case insensitive
+    };
+
+    const applyFilters = () => {
+        filterRules = getFilterRules();
+        
+        if (filterRules.length === 0) {
+            filteredGists = allGists;
+            filterIndicator.classList.remove('active');
+        } else {
+            filteredGists = allGists.filter(gist => {
+                return filterRules.every(rule => {
+                    let fieldValue = '';
+                    
+                    switch (rule.field) {
+                        case 'owner':
+                            fieldValue = gist.owner.login;
+                            break;
+                        case 'filename':
+                            fieldValue = Object.keys(gist.files)[0] || '';
+                            break;
+                        case 'visibility':
+                            fieldValue = gist.public ? 'public' : 'private';
+                            break;
+                    }
+                    
+                    const regex = wildcardToRegex(rule.value);
+                    const matches = regex.test(fieldValue);
+                    
+                    return rule.operator === 'contains' ? matches : !matches;
+                });
+            });
+            filterIndicator.classList.add('active');
+        }
+        
+        displayGists();
+    };
+
+    const showFilterModal = () => {
+        if (filterModalMinimized) {
+            restoreFilterModal();
+            return;
+        }
+
+        filterModal.style.position = 'fixed';
+        
+        if (!filterModal.style.left || !filterModal.style.top) {
+            const centerX = window.innerWidth / 2 - 400;
+            const centerY = 50;
+            filterModal.style.left = `${centerX}px`;
+            filterModal.style.top = `${centerY}px`;
+        }
+
+        filterModal.style.display = 'block';
+        filterModal.style.zIndex = getNextZIndex();
+        filterModalBackdrop.style.display = 'block';
+        filterModalBackdrop.style.zIndex = filterModal.style.zIndex - 1;
+        
+        // Add initial filter row if none exist
+        if (filterRows.children.length === 0) {
+            addFilterRow();
+        }
+    };
+
+    const hideFilterModal = () => {
+        filterModal.style.display = 'none';
+        filterModalBackdrop.style.display = 'none';
+        filterModalMinimized = false;
+        updateMinimizedBar();
+    };
+
+    const minimizeFilterModal = () => {
+        filterModalMinimized = true;
+        filterModal.style.display = 'none';
+        filterModalBackdrop.style.display = 'none';
+        updateMinimizedBar();
+    };
+
+    const restoreFilterModal = () => {
+        filterModalMinimized = false;
+        filterModal.style.display = 'block';
+        filterModal.style.zIndex = getNextZIndex();
+        filterModalBackdrop.style.display = 'block';
+        filterModalBackdrop.style.zIndex = filterModal.style.zIndex - 1;
+        updateMinimizedBar();
+    };
+
+    // Filter modal drag functionality
+    const startFilterModalDrag = (e) => {
+        e.preventDefault();
+        const rect = filterModal.getBoundingClientRect();
+        filterModalDragData = {
+            offsetX: e.clientX - rect.left,
+            offsetY: e.clientY - rect.top,
+            isDragging: true
+        };
+
+        filterModalHeader.classList.add('dragging');
+        filterModal.style.zIndex = getNextZIndex();
+
+        document.addEventListener('mousemove', handleFilterModalDrag);
+        document.addEventListener('mouseup', stopFilterModalDrag);
+    };
+
+    const handleFilterModalDrag = (e) => {
+        if (!filterModalDragData || !filterModalDragData.isDragging) return;
+
+        let newLeft = e.clientX - filterModalDragData.offsetX;
+        let newTop = e.clientY - filterModalDragData.offsetY;
+
+        const modalRect = filterModal.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+
+        newLeft = Math.max(0, Math.min(newLeft, viewportWidth - modalRect.width));
+        newTop = Math.max(0, Math.min(newTop, viewportHeight - modalRect.height));
+
+        filterModal.style.left = `${newLeft}px`;
+        filterModal.style.top = `${newTop}px`;
+    };
+
+    const stopFilterModalDrag = () => {
+        if (!filterModalDragData) return;
+
+        filterModalHeader.classList.remove('dragging');
+        document.removeEventListener('mousemove', handleFilterModalDrag);
+        document.removeEventListener('mouseup', stopFilterModalDrag);
+        filterModalDragData = null;
+    };
+
     const displayGists = () => {
         const { column, direction } = currentSort;
         const modifier = direction === 'asc' ? 1 : -1;
 
-        allGists.sort((a, b) => {
+        // Use filtered gists if filters are applied, otherwise use all gists
+        const gistsToDisplay = filterRules.length > 0 ? filteredGists : allGists;
+
+        gistsToDisplay.sort((a, b) => {
             let valA, valB;
             if (column === 'filename') {
                 valA = (Object.keys(a.files)[0] || '').toLowerCase();
@@ -1111,12 +1560,13 @@ document.addEventListener("DOMContentLoaded", () => {
             warningHtml = `<div class="warning-message"><ul>${fetchWarnings.join('')}</ul></div>`;
         }
 
-        if (allGists.length === 0) {
-            resultsContainer.innerHTML = errorHtml + warningHtml + `<div class="status-message">No gists found.</div>`;
+        if (gistsToDisplay.length === 0) {
+            const message = filterRules.length > 0 ? 'No gists match the current filters.' : 'No gists found.';
+            resultsContainer.innerHTML = errorHtml + warningHtml + `<div class="status-message">${message}</div>`;
             return;
         }
 
-        const tableRows = allGists.map((gist, index) => {
+        const tableRows = gistsToDisplay.map((gist, index) => {
             const fileName = Object.keys(gist.files)[0] || 'N/A';
             const viewUrl = gist.html_url;
             const editUrl = `https://gist.github.com/${gist.owner.login}/${gist.id}/edit`;
@@ -1138,7 +1588,7 @@ document.addEventListener("DOMContentLoaded", () => {
         resultsContainer.innerHTML = `
             ${errorHtml}
             ${warningHtml}
-            <p class="summary">Found ${allGists.length} gists.</p>
+            <p class="summary">Found ${gistsToDisplay.length}${filterRules.length > 0 ? ` filtered` : ''} gists${allGists.length !== gistsToDisplay.length ? ` (${allGists.length} total)` : ''}.</p>
             <div class="table-container">
                 <table>
                     <thead>
@@ -1182,9 +1632,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 const rawUrl = el.dataset.rawUrl;
                 if (!rawUrl || rawUrl === '#') return;
 
-                // Get gist data for this element
+                // Get gist data for this element using the displayed index
                 const gistIndex = parseInt(el.dataset.gistIndex);
-                const gist = allGists[gistIndex];
+                const gist = gistsToDisplay[gistIndex];
                 const fileName = gist ? Object.keys(gist.files)[0] || 'N/A' : 'N/A';
 
                 showStickyPopup(rawUrl, fileName, gist);
@@ -1200,9 +1650,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 const rawUrl = row.dataset.rawUrl;
                 if (!rawUrl || rawUrl === '#') return;
 
-                // Get gist data for this row
-                const index = Array.from(row.parentNode.children).indexOf(row);
-                const gist = allGists[index];
+                // Get gist data for this row using the displayed index
+                const displayIndex = parseInt(row.dataset.gistIndex);
+                const gist = gistsToDisplay[displayIndex];
                 const fileName = Object.keys(gist.files)[0] || 'N/A';
 
                 showStickyPopup(rawUrl, fileName, gist);
@@ -1446,8 +1896,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const updateMinimizedBar = () => {
         const minimizedPopups = Array.from(activePopups.values()).filter(p => p.isMinimized);
 
-        // Check if help modal is minimized
-        const hasMinimizedItems = minimizedPopups.length > 0 || helpModalMinimized;
+        // Check if any modal is minimized
+        const hasMinimizedItems = minimizedPopups.length > 0 || helpModalMinimized || filterModalMinimized;
 
         if (!hasMinimizedItems) {
             minimizedBar.style.display = 'none';
@@ -1469,6 +1919,20 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             minimizedBar.appendChild(helpItem);
+        }
+
+        // Generated by Copilot - Add filter modal to minimized bar if minimized
+        if (filterModalMinimized) {
+            const filterItem = document.createElement('div');
+            filterItem.className = 'minimized-item';
+            filterItem.textContent = 'Filter';
+            filterItem.title = 'Filter Configuration - Click to restore';
+
+            filterItem.addEventListener('click', () => {
+                restoreFilterModal();
+            });
+
+            minimizedBar.appendChild(filterItem);
         }
 
         minimizedPopups.forEach((popupData) => {
@@ -1965,6 +2429,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         fetchGists();
     });
+    // Generated by Copilot - Filter button event listener
+    filterBtn.addEventListener('click', showFilterModal);
     clearBtn.addEventListener('click', clearInputs);
     resetBtn.addEventListener('click', resetApp);
     helpBtn.addEventListener('click', showHelpModal);
@@ -1979,6 +2445,22 @@ document.addEventListener("DOMContentLoaded", () => {
     if (helpModalTitle) {
         helpModalTitle.addEventListener('mousedown', startHelpModalDrag);
     }
+
+    // Generated by Copilot - Filter modal event listeners
+    addFilterRowBtn.addEventListener('click', addFilterRow);
+    clearFiltersBtn.addEventListener('click', () => {
+        clearAllFilters();
+        applyFilters();
+    });
+    applyFiltersBtn.addEventListener('click', () => {
+        applyFilters();
+        hideFilterModal();
+    });
+    closeFilterBtn.addEventListener('click', hideFilterModal);
+    closeFilterModalBtn.addEventListener('click', hideFilterModal);
+    minimizeFilterModalBtn.addEventListener('click', minimizeFilterModal);
+    filterModalHeader.addEventListener('mousedown', startFilterModalDrag);
+    filterModalBackdrop.addEventListener('click', hideFilterModal);
 
     // PAT section toggle event listener
     patHeader.addEventListener('click', togglePatSection);
