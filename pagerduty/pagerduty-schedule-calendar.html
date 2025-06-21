@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>PagerDuty Schedule Calendar</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -475,7 +475,8 @@
                 -webkit-overflow-scrolling: touch;
             }
             .calendar {
-                min-width: 700px;
+                width: 100%;
+                table-layout: fixed;
             }
             .calendar-controls {
                 flex-direction: column;
@@ -505,6 +506,11 @@
             }
             .legend {
                 justify-content: center;
+            }
+            .calendar-header th {
+                font-size: 0.8rem;
+                padding: 10px 2px;
+                white-space: nowrap;
             }
         }
         @media (max-width: 480px) {
