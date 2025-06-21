@@ -1,101 +1,100 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Encrypt/Decrypt with XOR and Base64</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Encrypt/Decrypt with AES</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+
     <style>
         body {
             font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
             margin: 0;
             padding: 0;
-            background-color: #f4f4f4;
         }
+
         .container {
-            max-width: 100%;
-            width: 60%;
-            margin: 0 auto;
+            width: 90%;
+            max-width: 1000px;
+            margin: 30px auto;
             padding: 20px;
-            border: 1px solid #ccc;
+            background: #fff;
             border-radius: 8px;
-            background-color: white;
-            box-sizing: border-box;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
-        textarea, input[type="text"], input[type="password"] {
-            width: 100%;
-            padding: 12px;
+
+        @media (min-width: 1000px) {
+            .container {
+                width: 70%;
+            }
+        }
+
+        h2 {
             margin-bottom: 10px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: bold;
+        }
+
+        textarea,
+        input[type="text"],
+        input[type="password"],
+        select,
+        input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
             border: 1px solid #ccc;
             border-radius: 4px;
             font-size: 16px;
             box-sizing: border-box;
         }
-        /* Ensuring the password input is a normal one-line text input */
-        input[type="password"] {
-            min-height: 40px; /* Adjust height to match typical input field height */
-            resize: none; /* Prevent resizing */
+
+        input[type="checkbox"] {
+            margin-right: 8px;
         }
-        input[type="file"] {
+
+        button {
+            padding: 12px;
             width: 100%;
             margin-bottom: 10px;
-            padding: 10px;
-            box-sizing: border-box;
-        }
-        button {
-            padding: 12px 20px;
             background-color: #4CAF50;
             color: white;
             border: none;
-            border-radius: 4px;
             font-size: 16px;
+            border-radius: 4px;
             cursor: pointer;
-            width: 100%;
-            margin-bottom: 10px;
-            box-sizing: border-box;
         }
+
         button:hover {
             background-color: #45a049;
         }
-        label {
-            display: block;
-            margin-bottom: 8px;
+
+        #outputText, #inputText {
+            min-height: 100px;
+            overflow-y: hidden;
+            resize: vertical;
             font-size: 16px;
+            line-height: 1.4;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            width: 100%;
         }
-        .file-input {
-            margin-bottom: 20px;
-        }
-        .flex-container {
-            display: flex;
-            justify-content: space-between;
-            flex-wrap: wrap;
-        }
-        .flex-container input[type="radio"] {
-            margin-right: 5px;
-        }
-        .flex-container label {
-            width: 48%;
-        }
-        .text-area-group {
-            margin-bottom: 10px;
-        }
-        @media (min-width: 600px) {
-            .container {
-                width: 60%; /* At least 60% of the screen width on larger screens */
-            }
-            button {
-                width: auto;
-            }
-        }
+
         @media (max-width: 600px) {
-            .flex-container label {
-                width: 100%;
-                margin-bottom: 10px;
+            .container {
+                margin: 10px;
+                padding: 15px;
             }
-            .flex-container {
-                display: block;
-            }
+
             button {
-                width: 100%;
+                font-size: 15px;
             }
         }
     </style>
@@ -103,34 +102,24 @@
 <body>
 
 <div class="container">
-    <h2>Encrypt/Decrypt Text with XOR and Base64</h2>
+    <h2>Encrypt/Decrypt Text with AES</h2>
 
-    <div class="file-input">
-        <label for="fileInput">Upload a File:</label>
-        <input type="file" id="fileInput" />
-    </div>
+    <label for="modeSelect">Mode:</label>
+    <select id="modeSelect">
+        <option value="encrypt">Encrypt</option>
+        <option value="decrypt">Decrypt</option>
+    </select>
 
-    <div class="text-area-group">
-        <label for="inputText">Input Text (one line per entry):</label>
-        <textarea id="inputText" placeholder="Enter text here..."></textarea>
-    </div>
+    <label for="fileInput">Upload a File:</label>
+    <input type="file" id="fileInput" />
 
-    <div class="text-area-group">
-        <label for="password">Password:</label>
-        <input type="password" id="password" placeholder="Enter password" />
-    </div>
+    <label for="inputText">Input Text (one line per entry):</label>
+    <textarea id="inputText" placeholder="Enter text here..."></textarea>
 
-    <label for="showPassword">Show Password:</label>
-    <input type="checkbox" id="showPassword" onclick="togglePasswordVisibility()" />
+    <label for="password">Password:</label>
+    <input type="password" id="password" placeholder="Enter password" />
 
-    <div class="flex-container">
-        <div>
-            <input type="radio" id="encryptMode" name="mode" value="encrypt" checked> Encrypt
-        </div>
-        <div>
-            <input type="radio" id="decryptMode" name="mode" value="decrypt"> Decrypt
-        </div>
-    </div>
+    <label><input type="checkbox" id="showPassword" onclick="togglePasswordVisibility()" /> Show Password</label>
 
     <button onclick="processText()">Submit</button>
     <button onclick="resetFields()">Reset</button>
@@ -138,78 +127,77 @@
     <h3>Output:</h3>
     <textarea id="outputText" readonly placeholder="Result will be displayed here..."></textarea>
 
-    <br>
-
     <button onclick="saveOutput()">Save Output</button>
 </div>
 
 <script>
-    function xorEncryptDecrypt(inputText, password) {
-        let passwordLength = password.length;
-        let lineLength = inputText.length;
-        let outputText = '';
-
-        for (let i = 0; i < lineLength; i++) {
-            let char = inputText[i];
-            let xorKey = password.charCodeAt(i % passwordLength) + lineLength;
-            let xorChar = String.fromCharCode(char.charCodeAt(0) ^ xorKey);
-            outputText += xorChar;
-        }
-
-        return outputText;
+    function aesEncrypt(plainText, password) {
+        const key = CryptoJS.PBKDF2(password, CryptoJS.enc.Utf8.parse('salt1234'), {
+            keySize: 256 / 32,
+            iterations: 1000
+        });
+        const iv = CryptoJS.lib.WordArray.random(16);
+        const encrypted = CryptoJS.AES.encrypt(plainText, key, { iv: iv });
+        const result = iv.concat(encrypted.ciphertext);
+        return CryptoJS.enc.Base64.stringify(result);
     }
 
-    function base64Encode(inputText) {
-        return btoa(inputText); // Base64 encoding
-    }
+    function aesDecrypt(encryptedBase64, password) {
+        const rawData = CryptoJS.enc.Base64.parse(encryptedBase64);
+        const iv = CryptoJS.lib.WordArray.create(rawData.words.slice(0, 4));
+        const ciphertext = CryptoJS.lib.WordArray.create(rawData.words.slice(4), rawData.sigBytes - 16);
+        const key = CryptoJS.PBKDF2(password, CryptoJS.enc.Utf8.parse('salt1234'), {
+            keySize: 256 / 32,
+            iterations: 1000
+        });
 
-    function base64Decode(inputText) {
-        return atob(inputText); // Base64 decoding
+        const decrypted = CryptoJS.AES.decrypt({ ciphertext: ciphertext }, key, { iv: iv });
+        return decrypted.toString(CryptoJS.enc.Utf8);
     }
 
     function processText() {
-        let inputText = document.getElementById('inputText').value;
-        let password = document.getElementById('password').value;
-        let mode = document.querySelector('input[name="mode"]:checked').value;
+        const inputText = document.getElementById('inputText').value;
+        const password = document.getElementById('password').value;
+        const mode = document.getElementById('modeSelect').value;
 
+        const lines = inputText.split('\n');
         let resultText = '';
-        let lines = inputText.split('\n'); // Split input text into lines
 
-        lines.forEach((line, index) => {
-            let processedLine = '';
-            
+        lines.forEach((line) => {
             if (mode === 'encrypt') {
-                let encryptedText = xorEncryptDecrypt(line, password);
-                processedLine = base64Encode(encryptedText); // Encrypt and then encode as Base64
-            } else if (mode === 'decrypt') {
-                let decodedText = base64Decode(line); // Decode from Base64 first
-                processedLine = xorEncryptDecrypt(decodedText, password); // Then decrypt
+                const encrypted = aesEncrypt(line, password);
+                resultText += encrypted + '\n';
+            } else {
+                try {
+                    const decrypted = aesDecrypt(line, password);
+                    resultText += decrypted + '\n';
+                } catch (e) {
+                    resultText += '[Decryption Error]\n';
+                }
             }
-
-            resultText += processedLine + '\n'; // Add each result on a new line
         });
 
-        document.getElementById('outputText').value = resultText.trim(); // Remove last newline
+        const output = document.getElementById('outputText');
+        output.value = resultText.trim();
+        autoResizeTextarea(output);
     }
 
     function togglePasswordVisibility() {
         const passwordField = document.getElementById('password');
-        const showPassword = document.getElementById('showPassword');
-        passwordField.type = showPassword.checked ? 'text' : 'password';
+        passwordField.type = document.getElementById('showPassword').checked ? 'text' : 'password';
     }
 
     function handleFileUpload(event) {
         const file = event.target.files[0];
+        if (!file) return;
+
         const reader = new FileReader();
-
         reader.onload = function(e) {
-            const fileContent = e.target.result;
-            document.getElementById('inputText').value = fileContent;
+            const inputArea = document.getElementById('inputText');
+            inputArea.value = e.target.result;
+            autoResizeTextarea(inputArea);
         };
-
-        if (file) {
-            reader.readAsText(file);
-        }
+        reader.readAsText(file);
     }
 
     function saveOutput() {
@@ -222,18 +210,31 @@
     }
 
     function resetFields() {
-        // Reset all fields
         document.getElementById('inputText').value = '';
         document.getElementById('outputText').value = '';
         document.getElementById('password').value = '';
         document.getElementById('fileInput').value = '';
         document.getElementById('showPassword').checked = false;
-        document.getElementById('encryptMode').checked = true;
-        document.getElementById('decryptMode').checked = false;
-        document.getElementById('password').type = 'password'; // Reset to password type
+        document.getElementById('modeSelect').value = 'encrypt';
+        document.getElementById('password').type = 'password';
+        autoResizeTextarea(document.getElementById('inputText'));
+        autoResizeTextarea(document.getElementById('outputText'));
     }
 
-    // Attach event listener to file input for handling file upload
+    function autoResizeTextarea(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = (textarea.scrollHeight) + 'px';
+    }
+
+    // Auto-resize as user types
+    document.getElementById('inputText').addEventListener('input', function() {
+        autoResizeTextarea(this);
+    });
+    document.getElementById('outputText').addEventListener('input', function() {
+        autoResizeTextarea(this);
+    });
+
+    // File upload
     document.getElementById('fileInput').addEventListener('change', handleFileUpload);
 </script>
 
