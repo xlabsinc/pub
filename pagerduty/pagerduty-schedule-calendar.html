@@ -64,9 +64,16 @@
             align-items: center;
         }
 
+        .api-input-container {
+            position: relative;
+            flex: 1;
+            min-width: 300px;
+        }
+
         .api-input {
             flex: 1;
             min-width: 300px;
+            width: 100%;
             padding: 15px 20px;
             border: none;
             border-radius: 25px;
@@ -75,6 +82,10 @@
             color: white;
             backdrop-filter: blur(10px);
             transition: all 0.3s ease;
+        }
+
+        .api-input.has-toggle {
+            padding-right: 50px;
         }
 
         .api-input::placeholder {
@@ -109,6 +120,47 @@
             opacity: 0.6;
             cursor: not-allowed;
             transform: none;
+        }
+
+        .eye-btn {
+            position: absolute;
+            right: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: rgba(255, 255, 255, 0.7);
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: color 0.2s ease;
+            z-index: 2;
+            user-select: none;
+            pointer-events: auto;
+        }
+
+        .eye-btn:hover {
+            color: rgba(255, 255, 255, 1);
+        }
+
+        .help-btn {
+            background: linear-gradient(135deg, #17a2b8, #138496);
+            color: white;
+            border: none;
+            padding: 0;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 45px;
+        }
+
+        .help-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(23, 162, 184, 0.4);
         }
 
         .status-indicator {
@@ -372,8 +424,10 @@
             padding: 25px;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
             z-index: 1000;
-            max-width: 400px;
-            width: 90%;
+            max-width: 800px;
+            width: 95%;
+            max-height: 85vh;
+            overflow-y: auto;
             display: none;
         }
 
@@ -575,11 +629,16 @@
 
         <div class="api-section">
             <div class="api-container">
-                <input type="password" id="apiKeyInput" class="api-input" 
-                       placeholder="Enter your PagerDuty API key..." 
-                       maxlength="100">
+                <div class="api-input-container">
+                    <input type="password" id="apiKeyInput" class="api-input has-toggle" 
+                           placeholder="Enter your PagerDuty API key..." 
+                           maxlength="100">
+                    <span class="eye-btn" id="eyeBtn" title="Show API key">
+                        👁️
+                    </span>
+                </div>
                 <input type="text" id="scheduleIdsInput" class="api-input"
-                       placeholder="Comma-separated schedule IDs (e.g., P123456,PABCDEF)...">
+                       placeholder="Schedule IDs: PFEF1Y3,PC5U0ID,P0UH209,P4452CZ">
                 <button class="connect-btn" id="connectBtn">
                     🔗 Connect
                 </button>
@@ -588,6 +647,9 @@
                 </button>
                 <button class="connect-btn" id="clearBtn" style="background: #6c757d;">
                     ✖️ Clear
+                </button>
+                <button class="help-btn" id="helpBtn" title="Show help information">
+                    ?
                 </button>
             </div>
             
@@ -638,12 +700,12 @@
             <div id="helpContent" style="display: none; text-align: left; margin-top: 15px;">
                 <p>1. Log in to your PagerDuty account</p>
                 <p>2. For API Key: Go to Configuration → API Access and create a new key.</p>
-                <p>3. For Schedule ID: Go to People → On-Call Schedules. The ID (e.g., P123456) is in the URL of the schedule page.</p>
+                <p>3. For Schedule ID: Go to People → On-Call Schedules. The ID (e.g., PFEF1Y3, PC5U0ID, P0UH209, P4452CZ) is in the URL of the schedule page.</p>
                 <p>4. Copy and paste the key and IDs above</p>
                 <br>
                 <p><strong>Alternative Usage (URL Hash):</strong></p>
                 <p>You can also provide credentials directly in the URL hash:</p>
-                <p><code>#apiKey=YOUR_API_KEY&schedules=ID1,ID2</code></p>
+                <p><code>#apiKey=YOUR_API_KEY&schedules=PFEF1Y3,PC5U0ID,P0UH209,P4452CZ</code></p>
                 <p>To display only the calendar, add `&view=calendar` to the URL hash.</p>
             </div>
         </div>
@@ -656,6 +718,30 @@
         <h3 id="detailTitle">Schedule Details</h3>
         <div id="detailContent">
             <!-- Details will be populated here -->
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div class="modal-overlay" id="helpModalOverlay" style="display: none;"></div>
+    <div class="schedule-details" id="helpModal" style="display: none;">
+        <button class="close-details" id="closeHelpModal">×</button>
+        <h3>How to get your API key & Schedule ID</h3>
+        <div style="text-align: left; word-wrap: break-word;">
+            <p>1. Log in to your PagerDuty account</p>
+            <p>2. For API Key: Go to Configuration → API Access and create a new key.</p>
+            <p>3. For Schedule ID: Go to People → On-Call Schedules. The ID (e.g., PFEF1Y3, PC5U0ID, P0UH209, P4452CZ) is in the URL of the schedule page.</p>
+            <p>4. Copy and paste the key and IDs above</p>
+            <br>
+            <p><strong>Alternative Usage (URL Hash):</strong></p>
+            <br>
+            <p>You can also provide credentials directly in the URL hash:</p>
+            <p><code style="word-break: break-all;">#apiKey=YOUR_API_KEY&schedules=PFEF1Y3,PC5U0ID,P0UH209,P4452CZ</code></p>
+            <br>
+            <p><strong>To display only the calendar </strong>, add <code style="word-break: break-all;"> &view=calendar </code> to the URL hash.</p>
+            <p><code style="word-break: break-all;">#apiKey=YOUR_API_KEY&schedules=PFEF1Y3,PC5U0ID,P0UH209,P4452CZ&view=calendar</code></p>
+            <br>
+            <p><strong>Complete example:</strong></p>
+            <p><code style="word-break: break-all;">https://yoursite.com/pagerduty-schedule-calendar.html#apiKey=YOUR_API_KEY&schedules=PFEF1Y3,PC5U0ID,P0UH209,P4452CZ&view=calendar</code></p>
         </div>
     </div>
 
@@ -687,6 +773,8 @@
                 this._connectButton = document.getElementById('connectBtn');
                 this._disconnectButton = document.getElementById('disconnectBtn');
                 this._clearButton = document.getElementById('clearBtn');
+                this._eyeButton = document.getElementById('eyeBtn');
+                this._helpButton = document.getElementById('helpBtn');
                 this._statusDot = document.getElementById('statusDot');
                 this._statusText = document.getElementById('statusText');
                 this._calendarContainer = document.getElementById('calendarContainer');
@@ -698,6 +786,9 @@
                 this._modalContent = document.getElementById('detailContent');
                 this._modalClose = document.querySelector('.close-details');
                 this._modalOverlay = document.getElementById('modalOverlay');
+                this._helpModal = document.getElementById('helpModal');
+                this._helpModalOverlay = document.getElementById('helpModalOverlay');
+                this._closeHelpModal = document.getElementById('closeHelpModal');
                 this._welcomeMessage = document.getElementById('welcomeMessage');
                 this._calendarControls = document.getElementById('calendarControls');
                 this._lastUpdated = document.getElementById('lastUpdated');
@@ -712,6 +803,8 @@
                 this._connectButton.addEventListener('click', () => this.connectToPagerDuty());
                 this._disconnectButton.addEventListener('click', () => this.disconnect());
                 this._clearButton.addEventListener('click', () => this.clearForm());
+                this._eyeButton.addEventListener('click', () => this.togglePasswordVisibility());
+                this._helpButton.addEventListener('click', () => this.showHelpModal());
                 
                 this._apiKeyInput.addEventListener('input', () => this.handleInputChange());
                 this._scheduleIdsInput.addEventListener('input', () => this.handleInputChange());
@@ -727,6 +820,7 @@
                 this._nextMonthBtn.addEventListener('click', () => this.nextMonth());
                 
                 this._modalClose.addEventListener('click', () => this.closeScheduleDetails());
+                this._closeHelpModal.addEventListener('click', () => this.closeHelpModal());
 
                 this._toggleHelp.addEventListener('click', () => this.toggleHelp());
 
@@ -772,6 +866,32 @@
                 if (e.target === this._modalOverlay) {
                     this.closeScheduleDetails();
                 }
+                if (e.target === this._helpModalOverlay) {
+                    this.closeHelpModal();
+                }
+            }
+
+            togglePasswordVisibility() {
+                // Generated by Copilot
+                if (this._apiKeyInput.type === 'password') {
+                    this._apiKeyInput.type = 'text';
+                    this._eyeButton.textContent = '🙈';
+                    this._eyeButton.title = 'Hide API key';
+                } else {
+                    this._apiKeyInput.type = 'password';
+                    this._eyeButton.textContent = '👁️';
+                    this._eyeButton.title = 'Show API key';
+                }
+            }
+
+            showHelpModal() {
+                this._helpModal.style.display = 'block';
+                this._helpModalOverlay.style.display = 'block';
+            }
+
+            closeHelpModal() {
+                this._helpModal.style.display = 'none';
+                this._helpModalOverlay.style.display = 'none';
             }
 
             handleInputChange() {
@@ -1123,23 +1243,15 @@
             prepareSchedulesForRender() {
                 const sortedSchedules = [...this._processedSchedules].sort((a, b) => a.start - b.start);
 
-                // --- Slot Assignment ---
-                const slots = [];
+                // --- Slot Assignment based on schedule order ---
+                const scheduleSlotMap = new Map();
+                this._scheduleIds.forEach((scheduleId, index) => {
+                    scheduleSlotMap.set(scheduleId, index);
+                });
+
                 sortedSchedules.forEach(schedule => {
-                    let assignedToSlot = false;
-                    for (let i = 0; i < slots.length; i++) {
-                        const lastScheduleInSlot = slots[i][slots[i].length - 1];
-                        if (lastScheduleInSlot.end.getTime() <= schedule.start.getTime()) {
-                            schedule.slotIndex = i;
-                            slots[i].push(schedule);
-                            assignedToSlot = true;
-                            break;
-                        }
-                    }
-                    if (!assignedToSlot) {
-                        schedule.slotIndex = slots.length;
-                        slots.push([schedule]);
-                    }
+                    const baseSlot = scheduleSlotMap.get(schedule.scheduleId) || 0;
+                    schedule.slotIndex = baseSlot;
                 });
 
                 // --- Color Assignment ---
