@@ -1,57 +1,67 @@
-`crypt/csv.html`, is a self-contained HTML page that provides a simple web-based tool for encrypting or decrypting text (or file contents) using a custom XOR cipher combined with Base64 encoding/decoding. Here’s a breakdown of its purpose and functionality:
+# crypt/csv.html
+
+`crypt/csv.html` is a self-contained HTML page that provides a web-based tool for encrypting and decrypting text (or file contents) using AES encryption with password-based key derivation. It offers a modern, responsive interface suitable for desktop and mobile browsers.
 
 ---
 
 ### **Main Functionality**
 
 - **Encrypt/Decrypt Text or File Contents**
-  - The user can input text directly or upload a file (such as a CSV or plain text file). Each line is treated separately.
-  - The user provides a password, which is used as a key in the XOR encryption/decryption process.
-  - The user chooses between “Encrypt” and “Decrypt” modes.
-  - When encrypting, each character in the input is XOR’d with a key derived from the password and the line length, then the result is Base64-encoded.
-  - When decrypting, the input is first Base64-decoded, then XOR’d using the same logic to recover the original text.
+  - Users can input text directly or upload a file (such as CSV or plain text). Each line is processed separately.
+  - A password is provided and used to derive a strong AES key with PBKDF2 and salt.
+  - Users select between “Encrypt” and “Decrypt” modes via a dropdown menu.
+  - Encryption produces AES-encrypted, Base64-encoded output; decryption reverses this process.
 
 ---
 
 ### **UI Elements**
 
-- **File Upload**: Allows the user to choose and load a file. Its contents populate the input text area.
-- **Input Text Area**: Users can type or paste text to encrypt/decrypt (one entry per line).
-- **Password Field**: For entering the encryption/decryption key (with option to show/hide password).
-- **Encrypt/Decrypt Toggle**: Radio buttons to select the operation mode.
-- **Submit Button**: Processes the input according to the selected mode.
-- **Output Text Area**: Shows the resulting encrypted or decrypted text.
-- **Save Output Button**: Lets the user download the result as a text file.
-- **Reset Button**: Clears all input fields and resets the form.
+- **Mode Dropdown**: Select between Encrypt or Decrypt, placed prominently at the top for better UX.
+- **File Upload**: Load a file’s contents directly into the input textarea.
+- **Input Textarea**: Multi-line input for text or file contents (one line per entry).
+- **Password Field**: Enter the encryption/decryption password with an option to show/hide the password.
+- **Submit Button**: Processes the input using the selected mode.
+- **Reset Button**: Clears all fields and resets selections.
+- **Output Textarea**: Displays the encrypted or decrypted result, auto-resizes with content and supports manual resizing with a scrollbar.
+- **Save Output Button**: Download the output as a text file.
 
 ---
 
 ### **How the Algorithm Works**
 
-- **Encryption**:
-  1. For each line, iterate over its characters.
-  2. For each character, XOR it with a value derived from the password (password character code at position `i % password.length` plus the line’s length).
-  3. The result is then Base64-encoded for safe output/sharing.
+- **Encryption**
+  1. The password is processed with PBKDF2 and a fixed salt to derive an AES key.
+  2. For each line, a random initialization vector (IV) is generated.
+  3. The line is encrypted with AES-CBC mode using the key and IV.
+  4. The IV is prepended to the ciphertext, and the result is Base64-encoded for output.
 
-- **Decryption**:
-  1. Base64-decode each line.
-  2. XOR each character with the same key logic as above to recover the original.
+- **Decryption**
+  1. The Base64-encoded input is decoded.
+  2. The first 16 bytes are extracted as the IV.
+  3. The remaining bytes are the ciphertext.
+  4. The ciphertext is decrypted with AES-CBC mode using the derived key and IV.
+  5. The original plaintext line is recovered.
 
 ---
 
 ### **Use Cases**
 
-- Protecting sensitive text data in a simple way.
-- Encrypting/decrypting CSV or plain text files using a password.
-- Quick, client-side (browser-based) encryption/decryption without uploading data to a server.
+- Securely encrypt or decrypt text data directly in the browser without server involvement.
+- Encrypt or decrypt CSV or plain text files line-by-line using a password.
+- A simple, portable AES tool that works on desktops and mobile devices.
 
 ---
 
 ### **Security Note**
 
-- The encryption method (simple XOR with a key derived from the password and line length, then Base64) is **not secure** for serious use. It can be easily broken and should only be used for obfuscation or trivial purposes.
+- Uses AES encryption with a standard key derivation function (PBKDF2) and random IVs for each line, making it significantly more secure than simple XOR.
+- Suitable for basic client-side encryption needs but not a replacement for comprehensive cryptographic solutions in production environments.
 
 ---
 
 **Summary:**  
-This HTML file provides a browser-based tool to encrypt/decrypt lines of text or file contents with a password, using a basic XOR cipher and Base64 encoding. It’s useful for simple obfuscation, not for strong security.
+This file implements a client-side AES encryption/decryption tool with a clean, responsive UI. It enables secure line-by-line processing of text or files with password-based key derivation and output saving functionality.
+
+---
+
+
