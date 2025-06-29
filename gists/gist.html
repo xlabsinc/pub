@@ -1816,6 +1816,8 @@ document.addEventListener("DOMContentLoaded", () => {
         row.innerHTML = `
             <select class="filter-field">
                 <option value="filename">Filename</option>
+                <option value="extension">File Extension</option>
+                <option value="description">Description</option>
                 <option value="owner">Owner</option>
                 <option value="visibility">Visibility</option>
             </select>
@@ -2039,6 +2041,40 @@ document.addEventListener("DOMContentLoaded", () => {
         return new RegExp(regexPattern, 'i'); // Case insensitive
     };
 
+    // Helper functions for enhanced gist searching
+
+    const getAllFileNames = (gist) => {
+        return Object.keys(gist.files || {});
+    };
+
+    const getAllFileExtensions = (gist) => {
+        return getAllFileNames(gist).map(fileName => {
+            const ext = fileName.split('.').pop()?.toLowerCase() || '';
+            return ext;
+        });
+    };
+
+    const matchesAnyFile = (gist, pattern, operator, searchType = 'filename') => {
+        const regex = wildcardToRegex(pattern);
+        let searchValues = [];
+
+        switch (searchType) {
+            case 'filename':
+                searchValues = getAllFileNames(gist);
+                break;
+            case 'extension':
+                searchValues = getAllFileExtensions(gist);
+                break;
+            default:
+                return false;
+        }
+
+        return searchValues.some(value => {
+            const matches = regex.test(value);
+            return operator === 'contains' ? matches : !matches;
+        });
+    };
+
     // CNF Filter Implementation
     const applyFilters = () => {
         const filterGroups = getInlineFilterGroups();
@@ -2061,17 +2097,26 @@ document.addEventListener("DOMContentLoaded", () => {
                                 fieldValue = gist.owner.login;
                                 break;
                             case 'filename':
-                                fieldValue = Object.keys(gist.files)[0] || '';
+                                // Use helper function to check all filenames in the gist
+                                return matchesAnyFile(gist, rule.value, rule.operator, 'filename');
+                            case 'extension':
+                                // Use helper function to check all file extensions in the gist
+                                return matchesAnyFile(gist, rule.value, rule.operator, 'extension');
+                            case 'description':
+                                // Search in gist description
+                                fieldValue = gist.description || '';
                                 break;
                             case 'visibility':
                                 fieldValue = gist.public ? 'public' : 'private';
                                 break;
                         }
 
-                        const regex = wildcardToRegex(rule.value);
-                        const matches = regex.test(fieldValue);
-
-                        return rule.operator === 'contains' ? matches : !matches;
+                        // For standard text fields, use the original logic
+                        if (rule.field !== 'filename' && rule.field !== 'extension') {
+                            const regex = wildcardToRegex(rule.value);
+                            const matches = regex.test(fieldValue);
+                            return rule.operator === 'contains' ? matches : !matches;
+                        }
                     });
                 });
             });
@@ -2097,8 +2142,12 @@ document.addEventListener("DOMContentLoaded", () => {
         gistsToDisplay.sort((a, b) => {
             let valA, valB;
             if (column === 'filename') {
-                valA = (Object.keys(a.files)[0] || '').toLowerCase();
-                valB = (Object.keys(b.files)[0] || '').toLowerCase();
+                // For filename sorting, consider all filenames in each gist
+                // Use the first filename alphabetically as the sort key for the gist
+                const fileNamesA = Object.keys(a.files).sort();
+                const fileNamesB = Object.keys(b.files).sort();
+                valA = (fileNamesA[0] || '').toLowerCase();
+                valB = (fileNamesB[0] || '').toLowerCase();
             } else if (column === 'owner') {
                 valA = a.owner.login.toLowerCase();
                 valB = b.owner.login.toLowerCase();
