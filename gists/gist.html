@@ -704,6 +704,42 @@
             background-color: #f6f8fa;
         }
 
+        /* Style for multi-file gist rows */
+        tr[data-file-index]:not([data-file-index="0"]) {
+            border-left: 3px solid #e1e4e8;
+        }
+
+        /* Add subtle background for non-first files to show grouping */
+        tr[data-file-index]:not([data-file-index="0"]) {
+            background-color: #f8f9fa;
+        }
+
+        tr[data-file-index]:not([data-file-index="0"]):hover {
+            background-color: #e9ecef;
+        }
+
+        /* Private gist styling for non-first files */
+        tr.private-gist[data-file-index]:not([data-file-index="0"]) {
+            background-color: #fcf8e3;
+        }
+
+        tr.private-gist[data-file-index]:not([data-file-index="0"]):hover {
+            background-color: #faf2cc;
+        }
+
+        /* Style for file count indicator */
+        tr[data-file-index] td small {
+            font-style: italic;
+            font-weight: normal;
+        }
+
+        /* Make S.No column stand out for all files */
+        tr[data-file-index] td:first-child {
+            font-weight: 600;
+            color: #0366d6;
+            text-align: center;
+        }
+
         tr.private-gist {
             background-color: #fffbea;
         }
@@ -2093,29 +2129,59 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        let serialNumber = 0; // Track sequential serial numbers for all files
         const tableRows = gistsToDisplay.map((gist, index) => {
-            const fileName = Object.keys(gist.files)[0] || 'N/A';
+            const fileNames = Object.keys(gist.files);
             const viewUrl = gist.html_url;
             const editUrl = `https://gist.github.com/${gist.owner.login}/${gist.id}/edit`;
-            const rawUrl = gist.files[fileName]?.raw_url || '#';
             const isPublic = gist.public;
 
-            return `
-                <tr class="${isPublic ? '' : 'private-gist'}" data-raw-url="${rawUrl}" data-gist-index="${index}">
-                    <td>${index + 1}</td>
-                    <td><a href="${gist.owner.html_url}" target="_blank">${gist.owner.login}</a></td>
-                    <td class="snippet-trigger" data-raw-url="${rawUrl}" data-gist-index="${index}"><a href="${viewUrl}" target="_blank">${fileName}</a></td>
-                    <td>${isPublic ? 'Public' : 'Private'}</td>
-                    <td><a href="${editUrl}" target="_blank">Edit</a></td>
-                    <td class="snippet-trigger" data-raw-url="${rawUrl}" data-gist-index="${index}"><a href="${rawUrl}" target="_blank">Raw</a></td>
-                    <td><button class="download-table-btn" data-raw-url="${rawUrl}" data-filename="${fileName}" title="Download ${fileName}">⬇️</button></td>
-                </tr>`;
+            // If gist has no files, show N/A row
+            if (fileNames.length === 0) {
+                serialNumber++;
+                return `
+                    <tr class="${isPublic ? '' : 'private-gist'}" data-gist-index="${index}">
+                        <td>${serialNumber}</td>
+                        <td><a href="${gist.owner.html_url}" target="_blank">${gist.owner.login}</a></td>
+                        <td>N/A</td>
+                        <td>${isPublic ? 'Public' : 'Private'}</td>
+                        <td><a href="${editUrl}" target="_blank">Edit</a></td>
+                        <td>N/A</td>
+                        <td>N/A</td>
+                    </tr>`;
+            }
+
+            // Create a row for each file in the gist
+            return fileNames.map((fileName, fileIndex) => {
+                const file = gist.files[fileName];
+                const rawUrl = file?.raw_url || '#';
+                serialNumber++; // Increment serial number for each file
+
+                return `
+                    <tr class="${isPublic ? '' : 'private-gist'}" data-raw-url="${rawUrl}" data-gist-index="${index}" data-file-index="${fileIndex}">
+                        <td>${serialNumber}</td>
+                        <td><a href="${gist.owner.html_url}" target="_blank">${gist.owner.login}</a></td>
+                        <td class="snippet-trigger" data-raw-url="${rawUrl}" data-gist-index="${index}" data-file-name="${fileName}">
+                            <a href="${viewUrl}" target="_blank">${fileName}</a>
+                            ${fileNames.length > 1 ? `<small style="color: #666; margin-left: 8px;">(${fileIndex + 1}/${fileNames.length})</small>` : ''}
+                        </td>
+                        <td>${isPublic ? 'Public' : 'Private'}</td>
+                        <td><a href="${editUrl}" target="_blank">Edit</a></td>
+                        <td class="snippet-trigger" data-raw-url="${rawUrl}" data-gist-index="${index}" data-file-name="${fileName}"><a href="${rawUrl}" target="_blank">Raw</a></td>
+                        <td><button class="download-table-btn" data-raw-url="${rawUrl}" data-filename="${fileName}" title="Download ${fileName}">⬇️</button></td>
+                    </tr>`;
+            }).join('');
         }).join('');
+
+        // Calculate total files across all gists to display
+        const totalFiles = gistsToDisplay.reduce((count, gist) => {
+            return count + Math.max(Object.keys(gist.files).length, 1); // At least 1 row per gist even if no files
+        }, 0);
 
         resultsContainer.innerHTML = `
             ${errorHtml}
             ${warningHtml}
-            <p class="summary">Found ${gistsToDisplay.length}${filterGroups.length > 0 ? ` filtered` : ''} gists${allGists.length !== gistsToDisplay.length ? ` (${allGists.length} total)` : ''}.</p>
+            <p class="summary">Found ${gistsToDisplay.length}${filterGroups.length > 0 ? ` filtered` : ''} gists with ${totalFiles} files${allGists.length !== gistsToDisplay.length ? ` (${allGists.length} total gists)` : ''}.</p>
             <div class="table-container">
                 <table>
                     <thead>
@@ -2162,7 +2228,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 // Get gist data for this element using the displayed index
                 const gistIndex = parseInt(el.dataset.gistIndex);
                 const gist = gistsToDisplay[gistIndex];
-                const fileName = gist ? Object.keys(gist.files)[0] || 'N/A' : 'N/A';
+                const fileName = el.dataset.fileName || (gist ? Object.keys(gist.files)[0] || 'N/A' : 'N/A');
 
                 showStickyPopup(rawUrl, fileName, gist);
             });
@@ -2180,7 +2246,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 // Get gist data for this row using the displayed index
                 const displayIndex = parseInt(row.dataset.gistIndex);
                 const gist = gistsToDisplay[displayIndex];
-                const fileName = Object.keys(gist.files)[0] || 'N/A';
+                const fileName = row.querySelector('.snippet-trigger')?.dataset.fileName || (gist ? Object.keys(gist.files)[0] || 'N/A' : 'N/A');
 
                 showStickyPopup(rawUrl, fileName, gist);
             });
