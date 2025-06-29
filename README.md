@@ -1,6 +1,9 @@
 ### gist viewer
 [https://xlabsinc.github.io/pub/gists/gist.html](https://xlabsinc.github.io/pub/gists/gist.html "Gist List")
 
+### one line gist viewer
+[https://xlabsinc.github.io/pub/gists/gistoneline.html](https://xlabsinc.github.io/pub/gists/gistoneline.html "One Line Gist List")
+
 ### github repo viewer
 [https://xlabsinc.github.io/pub/github/github-repos.html](https://xlabsinc.github.io/pub/github/github-repos.html "GitHub Repo List")
 
