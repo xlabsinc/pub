@@ -344,17 +344,64 @@
             margin-bottom: 15px;
         }
 
+        /* Filter group styles (CNF implementation) */
+        .filter-group {
+            background: #fff;
+            border: 2px solid #d1ecf1;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            padding: 15px;
+            position: relative;
+        }
+
+        .filter-group-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 12px;
+            color: #0c5460;
+            font-weight: 600;
+        }
+
+        .filter-group-label {
+            background: #b8daff;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+        }
+
+        .filter-group-remove-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .filter-group-remove-btn:hover {
+            background: #c82333;
+            opacity: 1;
+        }
+
         /* Inline filter row styles */
         .inline-filter-row {
             display: grid;
-            grid-template-columns: 1fr 150px 1fr auto;
+            grid-template-columns: 1fr 150px 1fr auto auto;
             gap: 10px;
             align-items: center;
-            margin-bottom: 15px;
-            padding: 10px;
+            margin-bottom: 10px;
+            padding: 8px 10px;
             background: #f8f9fa;
             border-radius: 6px;
             border: 1px solid #e9ecef;
+        }
+
+        .inline-filter-row:last-child {
+            margin-bottom: 0;
         }
 
         /* Mobile responsive inline filter row */
@@ -369,6 +416,19 @@
             .inline-filter-row input {
                 width: 100%;
                 font-size: 16px; /* Prevents zoom on iOS */
+            }
+
+            .inline-filter-actions {
+                display: flex;
+                gap: 8px;
+                justify-content: center;
+            }
+
+            .inline-filter-or-btn,
+            .inline-filter-remove-btn {
+                min-height: 40px;
+                min-width: 40px;
+                touch-action: manipulation;
             }
         }
 
@@ -389,7 +449,7 @@
 
         .inline-filter-actions {
             display: flex;
-            gap: 10px;
+            gap: 5px;
         }
 
         .inline-filter-remove-btn {
@@ -397,13 +457,13 @@
             color: white;
             border: none;
             border-radius: 4px;
-            padding: 8px 12px;
+            padding: 6px 10px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            min-width: 36px;
+            min-width: 32px;
         }
 
         .inline-filter-remove-btn:hover {
@@ -413,6 +473,24 @@
         .inline-filter-remove-btn:disabled {
             background: #ccc;
             cursor: not-allowed;
+        }
+
+        .inline-filter-or-btn {
+            background: #17a2b8;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 36px;
+        }
+
+        .inline-filter-or-btn:hover {
+            background: #138496;
         }
 
         .inline-filter-add-row-btn {
@@ -1239,10 +1317,11 @@
                         <span class="filter-toggle-icon" id="filterToggleIcon">▼</span>
                     </div>
                     <div class="filter-content" id="filterContent">
-                        <p class="filter-help">Add filters to refine your gist search results. Filters support wildcards (* and ?) and regex patterns (^, $).</p>
+                        <p class="filter-help">Add filters to refine your gist search results. Filters support wildcards (* and ?) and regex patterns (^, $).<br>
+                        <strong>Filter Logic:</strong> Rules within a group are joined by OR. Groups are joined by AND. Use the OR button to add rules to the same group.</p>
                         <div class="inline-filter-status" id="inlineFilterStatus">No filters configured</div>
                         <button class="inline-filter-add-row-btn" id="inlineAddFilterRowBtn">
-                            <span>+</span> Add Filter Rule
+                            <span>+</span> Add Filter Group
                         </button>
                         <div id="inlineFilterRows"></div>
                         <div class="inline-filter-controls">
@@ -1350,6 +1429,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let helpModalMinimized = false; // Help modal minimized state
     let filterRules = []; // Store active filter rules
     let filterRowCounter = 0; // For unique filter row IDs
+    let filterGroupCounter = 0; // For unique filter group IDs
 
     // Function to get next z-index for proper layering
     const getNextZIndex = () => {
@@ -1662,11 +1742,40 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     // Inline filter system functions
-    const createInlineFilterRow = () => {
+    const createFilterGroup = () => {
+        const groupId = `filter-group-${++filterGroupCounter}`;
+        const group = document.createElement('div');
+        group.className = 'filter-group';
+        group.id = groupId;
+
+        group.innerHTML = `
+            <div class="filter-group-header">
+                <span class="filter-group-label">Group ${filterGroupCounter}</span>
+                <button type="button" class="filter-group-remove-btn" title="Remove this group">Remove Group</button>
+            </div>
+        `;
+
+        // Add remove group functionality
+        const removeBtn = group.querySelector('.filter-group-remove-btn');
+        removeBtn.addEventListener('click', () => {
+            group.remove();
+            updateInlineFilterStatus();
+            applyFilters();
+        });
+
+        // Add the first filter row to the group
+        const firstRow = createInlineFilterRow(groupId);
+        group.appendChild(firstRow);
+
+        return group;
+    };
+
+    const createInlineFilterRow = (groupId) => {
         const rowId = `inline-filter-row-${++filterRowCounter}`;
         const row = document.createElement('div');
         row.className = 'inline-filter-row';
         row.id = rowId;
+        row.dataset.groupId = groupId;
 
         row.innerHTML = `
             <select class="filter-field">
@@ -1680,14 +1789,37 @@ document.addEventListener("DOMContentLoaded", () => {
             </select>
             <input type="text" class="filter-value" placeholder="Enter text (supports wildcards: *, ? and regex: ^, $)">
             <div class="inline-filter-actions">
+                <button type="button" class="inline-filter-or-btn" title="Add OR condition to this group">OR</button>
                 <button type="button" class="inline-filter-remove-btn" title="Remove this filter">×</button>
             </div>
         `;
 
+        // Add OR button functionality
+        const orBtn = row.querySelector('.inline-filter-or-btn');
+        orBtn.addEventListener('click', () => {
+            const group = document.getElementById(groupId);
+            if (group) {
+                const newRow = createInlineFilterRow(groupId);
+                group.appendChild(newRow);
+                updateInlineFilterStatus();
+            }
+        });
+
         // Add remove functionality
         const removeBtn = row.querySelector('.inline-filter-remove-btn');
         removeBtn.addEventListener('click', () => {
-            row.remove();
+            const group = document.getElementById(groupId);
+            const rowsInGroup = group ? group.querySelectorAll('.inline-filter-row').length : 0;
+
+            if (rowsInGroup <= 1) {
+                // If this is the last row in the group, remove the entire group
+                if (group) {
+                    group.remove();
+                }
+            } else {
+                // Otherwise, just remove this row
+                row.remove();
+            }
             updateInlineFilterStatus();
             applyFilters();
         });
@@ -1722,49 +1854,85 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const addInlineFilterRow = () => {
-        const row = createInlineFilterRow();
-        inlineFilterRows.appendChild(row);
+        const group = createFilterGroup();
+        inlineFilterRows.appendChild(group);
         updateInlineFilterStatus();
     };
 
     const clearAllInlineFilters = () => {
         inlineFilterRows.innerHTML = '';
         filterRowCounter = 0;
+        filterGroupCounter = 0;
         updateInlineFilterStatus();
         applyFilters();
     };
 
     const updateInlineFilterStatus = () => {
-        const rowCount = inlineFilterRows.children.length;
-        const activeFilters = getInlineFilterRules().length;
+        const groupCount = inlineFilterRows.children.length;
+        const activeGroups = getInlineFilterGroups().length;
+
+        let totalRows = 0;
+        let activeRules = 0;
+
+        // Count total rows and active rules
+        document.querySelectorAll('.filter-group').forEach(group => {
+            const rows = group.querySelectorAll('.inline-filter-row');
+            totalRows += rows.length;
+
+            rows.forEach(row => {
+                const value = row.querySelector('.filter-value').value.trim();
+                if (value) activeRules++;
+            });
+        });
 
         let statusText = '';
-        if (rowCount === 0) {
+        if (groupCount === 0) {
             statusText = 'No filters configured';
-        } else if (activeFilters === 0) {
-            statusText = `${rowCount} filter rule${rowCount === 1 ? '' : 's'} configured (enter values to activate)`;
+        } else if (activeGroups === 0) {
+            statusText = `${groupCount} filter group${groupCount === 1 ? '' : 's'} configured (enter values to activate)`;
         } else {
-            statusText = `${activeFilters} of ${rowCount} filter rule${rowCount === 1 ? '' : 's'} active`;
+            statusText = `${activeGroups} of ${groupCount} group${groupCount === 1 ? '' : 's'} active (${activeRules} rule${activeRules === 1 ? '' : 's'})`;
         }
 
         inlineFilterStatus.textContent = statusText;
     };
 
-    const getInlineFilterRules = () => {
-        const rules = [];
-        const rows = inlineFilterRows.querySelectorAll('.inline-filter-row');
+    const getInlineFilterGroups = () => {
+        const groups = [];
+        const groupElements = inlineFilterRows.querySelectorAll('.filter-group');
 
-        rows.forEach(row => {
-            const field = row.querySelector('.filter-field').value;
-            const operator = row.querySelector('.filter-operator').value;
-            const value = row.querySelector('.filter-value').value.trim();
+        groupElements.forEach(group => {
+            const rules = [];
+            const rows = group.querySelectorAll('.inline-filter-row');
 
-            if (value) {
-                rules.push({ field, operator, value });
+            rows.forEach(row => {
+                const field = row.querySelector('.filter-field').value;
+                const operator = row.querySelector('.filter-operator').value;
+                const value = row.querySelector('.filter-value').value.trim();
+
+                if (value) {
+                    rules.push({ field, operator, value });
+                }
+            });
+
+            if (rules.length > 0) {
+                groups.push(rules);
             }
         });
 
-        return rules;
+        return groups;
+    };
+
+    const getInlineFilterRules = () => {
+        // Legacy function for compatibility - flatten all groups into single array
+        const groups = getInlineFilterGroups();
+        const allRules = [];
+
+        groups.forEach(group => {
+            allRules.push(...group);
+        });
+
+        return allRules;
     };
 
     // Function to toggle filter section collapse/expand
@@ -1835,37 +2003,47 @@ document.addEventListener("DOMContentLoaded", () => {
         return new RegExp(regexPattern, 'i'); // Case insensitive
     };
 
+    // CNF Filter Implementation
     const applyFilters = () => {
-        filterRules = getInlineFilterRules();
+        const filterGroups = getInlineFilterGroups();
 
-        if (filterRules.length === 0) {
+        if (filterGroups.length === 0) {
             filteredGists = allGists;
             filterIndicator.classList.remove('active');
         } else {
+            // CNF Logic: Each group represents a clause (OR of conditions)
+            // All groups must be true (AND of clauses)
             filteredGists = allGists.filter(gist => {
-                return filterRules.every(rule => {
-                    let fieldValue = '';
+                // Every group must have at least one matching rule (AND of ORs)
+                return filterGroups.every(group => {
+                    // At least one rule in the group must match (OR within group)
+                    return group.some(rule => {
+                        let fieldValue = '';
 
-                    switch (rule.field) {
-                        case 'owner':
-                            fieldValue = gist.owner.login;
-                            break;
-                        case 'filename':
-                            fieldValue = Object.keys(gist.files)[0] || '';
-                            break;
-                        case 'visibility':
-                            fieldValue = gist.public ? 'public' : 'private';
-                            break;
-                    }
+                        switch (rule.field) {
+                            case 'owner':
+                                fieldValue = gist.owner.login;
+                                break;
+                            case 'filename':
+                                fieldValue = Object.keys(gist.files)[0] || '';
+                                break;
+                            case 'visibility':
+                                fieldValue = gist.public ? 'public' : 'private';
+                                break;
+                        }
 
-                    const regex = wildcardToRegex(rule.value);
-                    const matches = regex.test(fieldValue);
+                        const regex = wildcardToRegex(rule.value);
+                        const matches = regex.test(fieldValue);
 
-                    return rule.operator === 'contains' ? matches : !matches;
+                        return rule.operator === 'contains' ? matches : !matches;
+                    });
                 });
             });
             filterIndicator.classList.add('active');
         }
+
+        // Update legacy filterRules for backward compatibility
+        filterRules = getInlineFilterRules();
 
         // Update filter status after applying
         updateInlineFilterStatus();
@@ -1877,7 +2055,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const modifier = direction === 'asc' ? 1 : -1;
 
         // Use filtered gists if filters are applied, otherwise use all gists
-        const gistsToDisplay = filterRules.length > 0 ? filteredGists : allGists;
+        const filterGroups = getInlineFilterGroups();
+        const gistsToDisplay = filterGroups.length > 0 ? filteredGists : allGists;
 
         gistsToDisplay.sort((a, b) => {
             let valA, valB;
@@ -1909,7 +2088,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         if (gistsToDisplay.length === 0) {
-            const message = filterRules.length > 0 ? 'No gists match the current filters.' : 'No gists found.';
+            const message = filterGroups.length > 0 ? 'No gists match the current filters.' : 'No gists found.';
             resultsContainer.innerHTML = errorHtml + warningHtml + `<div class="status-message">${message}</div>`;
             return;
         }
@@ -1936,7 +2115,7 @@ document.addEventListener("DOMContentLoaded", () => {
         resultsContainer.innerHTML = `
             ${errorHtml}
             ${warningHtml}
-            <p class="summary">Found ${gistsToDisplay.length}${filterRules.length > 0 ? ` filtered` : ''} gists${allGists.length !== gistsToDisplay.length ? ` (${allGists.length} total)` : ''}.</p>
+            <p class="summary">Found ${gistsToDisplay.length}${filterGroups.length > 0 ? ` filtered` : ''} gists${allGists.length !== gistsToDisplay.length ? ` (${allGists.length} total)` : ''}.</p>
             <div class="table-container">
                 <table>
                     <thead>
