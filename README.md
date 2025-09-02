@@ -7,6 +7,9 @@
 ### github repo viewer
 [https://xlabsinc.github.io/pub/github/github-repos.html](https://xlabsinc.github.io/pub/github/github-repos.html "GitHub Repo List")
 
+### text to dataurl converter
+[https://xlabsinc.github.io/pub/dataurl/text2dataurl.html](https://xlabsinc.github.io/pub/dataurl/text2dataurl.html "Text to Data URL converter")
+
 ### pagerduty calendar
 [https://xlabsinc.github.io/pub/pagerduty/pagerduty-schedule-calendar.html](https://xlabsinc.github.io/pub/pagerduty/pagerduty-schedule-calendar.html "PagerDuty Schedule calendar")
 
