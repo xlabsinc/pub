@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Text to Data URL Converter</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2em;
+      background-color: #f9f9f9;
+      display: flex;
+      flex-direction: column;
+      /* align-items: center; */
+    }
+    textarea {
+      width: 80%;
+      max-width: 1000px;
+      font-family: monospace;
+      font-size: 14px;
+      padding: 10px;
+      margin-bottom: 1em;
+      border: 1px solid #ccc;
+      background-color: #fff;
+      resize: vertical;
+      overflow: auto;
+    }
+    #inputText {
+      height: 16.5em; /* ~15 lines */
+    }
+    #output {
+      width: 80%;
+      max-width: 1000px;
+      font-family: monospace;
+      font-size: 18px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      background-color: #fff;
+      resize: vertical;
+      height: 11.5em; /* ~10 lines */
+      overflow-y: auto;
+      overflow-x: hidden;
+      white-space: pre-wrap; /* wraps long lines */
+      word-wrap: break-word;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 0 10px 20px 10px;
+      cursor: pointer;
+    }
+    #status {
+      color: green;
+      font-style: italic;
+      margin-top: 0.5em;
+    }
+  </style>
+</head>
+<body>
+  <h2>Convert Text to Data URL (Base64)</h2>
+  <textarea id="inputText" placeholder="Paste your text here..."></textarea>
+  <div>
+    <button onclick="convertToDataURL()">Convert</button>
+    <button onclick="copyToClipboard()">Copy to Clipboard</button>
+  </div>
+  <textarea id="output" readonly></textarea>
+  <div id="status"></div>
+
+  <script>
+    let currentDataURL = '';
+
+    function convertToDataURL() {
+      const text = document.getElementById('inputText').value;
+      const base64 = btoa(unescape(encodeURIComponent(text)));
+      currentDataURL = 'data:text/plain;base64,' + base64;
+      document.getElementById('output').value = currentDataURL;
+      document.getElementById('status').innerText = '';
+    }
+
+    function copyToClipboard() {
+      if (!currentDataURL) {
+        document.getElementById('status').innerText = 'Please convert text first.';
+        return;
+      }
+      navigator.clipboard.writeText(currentDataURL)
+        .then(() => {
+          document.getElementById('status').innerText = 'Copied to clipboard!';
+        })
+        .catch(err => {
+          document.getElementById('status').innerText = 'Failed to copy.';
+          console.error('Clipboard error:', err);
+        });
+    }
+  </script>
+</body>
+</html>
+
