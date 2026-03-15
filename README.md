@@ -16,5 +16,8 @@
 ### encoder - decoder 
 [https://xlabsinc.github.io/pub/crypt/csv.html](https://xlabsinc.github.io/pub/crypt/csv.html "Encoder Decoder")
 
+### secret encrypt/decrypt
+[https://xlabsinc.github.io/pub/secret/secret.html](https://xlabsinc.github.io/pub/secret/secret.html "Secret Encrypt/Decrypt - Send API keys via text message")
+
 ### test get kural
 [https://xlabsinc.github.io/pub/tmp/getkural.html](https://xlabsinc.github.io/pub/tmp/getkural.html "Test Get Kural")
