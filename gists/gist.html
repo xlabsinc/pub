@@ -2151,6 +2151,9 @@ document.addEventListener("DOMContentLoaded", () => {
             } else if (column === 'owner') {
                 valA = a.owner.login.toLowerCase();
                 valB = b.owner.login.toLowerCase();
+            } else if (column === 'date') {
+                valA = new Date(a.updated_at).getTime();
+                valB = new Date(b.updated_at).getTime();
             } else { // visibility
                 valA = a.public ? 'public' : 'private';
                 valB = b.public ? 'public' : 'private';
@@ -2188,12 +2191,14 @@ document.addEventListener("DOMContentLoaded", () => {
             // If gist has no files, show N/A row
             if (fileNames.length === 0) {
                 serialNumber++;
+                const dateModified = new Date(gist.updated_at).toLocaleString();
                 return `
                     <tr class="${isPublic ? '' : 'private-gist'}" data-gist-index="${index}">
                         <td>${serialNumber}</td>
                         <td><a href="${gist.owner.html_url}" target="_blank">${gist.owner.login}</a></td>
                         <td>N/A</td>
                         <td>${isPublic ? 'Public' : 'Private'}</td>
+                        <td>${dateModified}</td>
                         <td><a href="${editUrl}" target="_blank">Edit</a></td>
                         <td>N/A</td>
                         <td>N/A</td>
@@ -2205,6 +2210,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const file = gist.files[fileName];
                 const rawUrl = file?.raw_url || '#';
                 serialNumber++; // Increment serial number for each file
+                const dateModified = new Date(gist.updated_at).toLocaleString();
 
                 return `
                     <tr class="${isPublic ? '' : 'private-gist'}" data-raw-url="${rawUrl}" data-gist-index="${index}" data-file-index="${fileIndex}">
@@ -2215,6 +2221,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             ${fileNames.length > 1 ? `<small style="color: #666; margin-left: 8px;">(${fileIndex + 1}/${fileNames.length})</small>` : ''}
                         </td>
                         <td>${isPublic ? 'Public' : 'Private'}</td>
+                        <td>${dateModified}</td>
                         <td><a href="${editUrl}" target="_blank">Edit</a></td>
                         <td class="snippet-trigger" data-raw-url="${rawUrl}" data-gist-index="${index}" data-file-name="${fileName}"><a href="${rawUrl}" target="_blank">Raw</a></td>
                         <td><button class="download-table-btn" data-raw-url="${rawUrl}" data-filename="${fileName}" title="Download ${fileName}">⬇️</button></td>
@@ -2239,6 +2246,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             <th class="sortable" data-column="owner">Owner</th>
                             <th class="sortable" data-column="filename">Filename</th>
                             <th class="sortable" data-column="visibility">Visibility</th>
+                            <th class="sortable" data-column="date">Date Modified</th>
                             <th>Edit</th>
                             <th>Raw</th>
                             <th>Download</th>
