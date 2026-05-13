@@ -19,8 +19,8 @@
 ### api key encrypt/decrypt
 [https://xlabsinc.github.io/pub/apikey/apikey.html](https://xlabsinc.github.io/pub/apikey/apikey.html "API Key Encrypt/Decrypt - Send API keys via text message")
 
-### api key encrypt/decrypt
-[https://xlabsinc.github.io/pub/investment-dashboard/dashboard.html](https://xlabsinc.github.io/pub/investment-dashboard/dashboard.html "Investment Intelligence Dashboar  - Interactive portfolio growth, risk, allocation, and forecast analysis")
+### Investment Interactive Dashboard
+[https://xlabsinc.github.io/pub/investment-dashboard/dashboard.html](https://xlabsinc.github.io/pub/investment-dashboard/dashboard.html "Investment Intelligence Dashboard  - Interactive portfolio growth, risk, allocation, and forecast analysis")
 
 ### test get kural
 [https://xlabsinc.github.io/pub/tmp/getkural.html](https://xlabsinc.github.io/pub/tmp/getkural.html "Test Get Kural")
