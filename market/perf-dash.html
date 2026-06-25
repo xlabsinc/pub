@@ -1,0 +1,1067 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Market Dashboard</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --card: #ffffff;
+      --text: #15202b;
+      --muted: #5a6b7b;
+      --accent: #0f5b7a;
+      --accent-2: #0e8f62;
+      --warn: #b8442f;
+      --line: #d7dde5;
+      --chip: #e7edf3;
+      --shadow: 0 6px 20px rgba(20, 40, 60, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: radial-gradient(circle at top right, #d9ecff 0, #f4f6f8 35%),
+                  linear-gradient(180deg, #eef3f9 0, #f4f6f8 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .wrap { max-width: 1460px; margin: 0 auto; padding: 20px; }
+
+    h1 { margin: 0 0 10px; font-size: clamp(1.3rem, 1.5vw + 0.9rem, 2rem); }
+
+    .sub { color: var(--muted); margin-bottom: 16px; font-size: 0.95rem; }
+
+    .toolbar { display: grid; gap: 10px; grid-template-columns: 1fr; margin-bottom: 16px; }
+
+    .buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    .cat-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--chip);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px;
+    }
+
+    .cat-btn {
+      border: 1px solid var(--line); background: var(--chip); color: #113248;
+      border-radius: 999px; padding: 6px 10px; font-size: 0.86rem;
+      cursor: pointer; transition: all 0.15s ease;
+    }
+    .cat-btn:hover { transform: translateY(-1px); }
+    .cat-btn.active {
+      background: var(--accent); color: #fff; border-color: var(--accent);
+      box-shadow: 0 3px 10px rgba(15, 91, 122, 0.25);
+    }
+
+    .cat-remove {
+      border: 1px solid #e0cfc9;
+      background: #fff5f3;
+      color: #8f3a2a;
+      border-radius: 999px;
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+      font-size: 0.72rem;
+      font-weight: 700;
+      line-height: 1;
+      margin-right: 2px;
+    }
+
+    .cat-remove:hover {
+      background: #fde0d8;
+    }
+
+    .control-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .control-row label { font-size: 0.85rem; color: #284459; font-weight: 600; }
+
+    .select, .input, .btn {
+      border: 1px solid var(--line); border-radius: 8px;
+      background: #fff; color: #1e3447; font-size: 0.85rem; padding: 6px 9px;
+    }
+    .input { min-width: 420px; max-width: 70vw; }
+    .btn { cursor: pointer; background: #f8fbff; }
+    .btn.primary { background: #e8f4ff; border-color: #b8d8f3; }
+    .btn.warn { background: #fff3ef; border-color: #f2c6bb; color: #7a2f20; }
+    .btn.success { background: #e6f8f0; border-color: #a8dfc4; color: #165c3a; }
+
+    .limit-display {
+      display: inline-block; min-width: 38px; text-align: center;
+      font-size: 0.9rem; font-weight: 700; color: #1b3a50;
+      background: #eef4fb; border: 1px solid var(--line);
+      border-radius: 8px; padding: 5px 8px;
+    }
+
+    details.sources {
+      border: 1px solid var(--line); border-radius: 12px;
+      background: #f9fcff; padding: 8px 10px;
+    }
+    details.sources summary {
+      cursor: pointer; font-size: 0.88rem; font-weight: 600; color: #284459;
+    }
+
+    .source-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+    .source-item {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      font-size: 0.82rem; background: #ffffff; border: 1px solid #d8e2ec;
+      border-radius: 8px; padding: 6px 8px;
+    }
+    .source-url { color: #2e495c; overflow-wrap: anywhere; flex: 1; }
+    .remove-source {
+      border: 1px solid #e6bcb2; background: #fff1ec; color: #7f2818;
+      border-radius: 999px; width: 22px; height: 22px; flex-shrink: 0;
+      cursor: pointer; font-weight: 700; line-height: 1; font-size: 0.82rem;
+    }
+
+    .source-status { font-size: 0.82rem; color: var(--muted); }
+
+    .meta {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 0.9rem;
+    }
+
+    .card {
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: 14px; box-shadow: var(--shadow); overflow: hidden;
+    }
+    .table-wrap { overflow-x: auto; max-height: 75vh; }
+
+    table { width: 100%; min-width: 1400px; border-collapse: collapse; }
+
+    thead th {
+      position: sticky; top: 0; z-index: 1; background: #f3f7fb;
+      font-size: 0.83rem; letter-spacing: 0.02em; color: #264357;
+      text-align: left; padding: 10px; border-bottom: 1px solid var(--line);
+      white-space: nowrap; cursor: pointer; user-select: none;
+    }
+    thead th.active-sort { background: #e8f2fb; color: #123b55; }
+    thead th.col-remove { cursor: default; width: 36px; padding: 6px; }
+
+    tbody td {
+      font-size: 0.9rem; padding: 9px 10px;
+      border-bottom: 1px solid #edf1f5; vertical-align: middle; white-space: nowrap;
+    }
+    tbody tr:hover { background: #f7fbff; }
+
+    .symbol { font-weight: 700; color: #1f3448; letter-spacing: 0.02em; }
+    .name { max-width: 320px; white-space: normal; line-height: 1.25; color: #2a3d4f; }
+
+    .cell-link { color: var(--accent); text-decoration: none; }
+    .cell-link:hover { text-decoration: underline; }
+
+    .sort-arrow { margin-left: 5px; font-size: 0.72rem; color: #4f6a7e; }
+
+    .pos { color: var(--accent-2); }
+    .neg { color: var(--warn); }
+    .muted { color: #738496; }
+
+    .loading {
+      color: #2b5f82; font-size: 0.82rem; background: #eaf4ff;
+      border: 1px solid #c4ddf8; border-radius: 999px; padding: 2px 8px; display: inline-block;
+    }
+    .error {
+      color: #8f2f1f; font-size: 0.82rem; background: #ffece7;
+      border: 1px solid #f0c2b6; border-radius: 999px; padding: 2px 8px; display: inline-block;
+    }
+
+    .range-cell { min-width: 190px; }
+    .range-values { display: flex; justify-content: space-between; font-size: 0.78rem; color: #556a7d; margin-bottom: 3px; }
+    .range-line { position: relative; height: 4px; border-radius: 999px; background: linear-gradient(90deg, #ccd6df 0%, #dbe4ec 100%); overflow: visible; }
+    .range-marker { position: absolute; top: -4px; width: 10px; height: 10px; border-radius: 999px; border: 2px solid #103f5a; background: #fff; transform: translateX(-50%); }
+
+    .row-remove {
+      border: 1px solid #e0cfc9; background: #fff5f3; color: #8f3a2a;
+      border-radius: 999px; width: 22px; height: 22px; cursor: pointer;
+      font-size: 0.78rem; font-weight: 700; line-height: 1; display: block; margin: auto;
+    }
+    .row-remove:hover { background: #fde0d8; }
+
+    .status-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .row-refresh {
+      border: 1px solid #c8d7e4;
+      background: #f2f8ff;
+      color: #22445c;
+      border-radius: 999px;
+      width: 22px;
+      height: 22px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      line-height: 1;
+      padding: 0;
+    }
+
+    .row-refresh:hover {
+      background: #e1effd;
+    }
+
+    .foot { margin-top: 10px; color: var(--muted); font-size: 0.85rem; }
+
+    @media (max-width: 700px) {
+      .wrap { padding: 12px; }
+      .table-wrap { max-height: none; }
+      .meta { font-size: 0.84rem; }
+      .input { min-width: 220px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Market - Equities, ETFs, Funds Performance Dashboard</h1>
+    <div class="sub">Category buttons are generated from configured JSON sources for generic market symbols. ETF details are fetched from Fidelity summary pages through a readable mirror.</div>
+
+    <div class="toolbar">
+      <div class="buttons" id="categoryButtons"></div>
+
+      <div class="control-row">
+        <label>Rows:</label>
+        <button id="minus5Btn" class="btn" type="button" title="Show 5 fewer rows">−5</button>
+        <span id="limitDisplay" class="limit-display">5</span>
+        <button id="plus5Btn" class="btn" type="button" title="Show 5 more rows">+5</button>
+        <button id="allBtn" class="btn" type="button">All</button>
+        <button id="refreshBtn" class="btn primary" type="button">Refresh</button>
+        <button id="forceRefreshBtn" class="btn warn" type="button">Force Refresh</button>
+        <button id="downloadConfigBtn" class="btn success" type="button">Download Config</button>
+        <button id="saveConfigBtn" class="btn success" type="button">Save Config</button>
+        <button id="clearConfigBtn" class="btn" type="button">Clear Config</button>
+      </div>
+
+      <details class="sources">
+        <summary>Manage Data Sources</summary>
+        <div class="control-row" style="margin-top:8px;">
+          <input id="sourceUrlInput" class="input" type="text" placeholder="Paste JSON URL or type file:// to browse local file" />
+          <button id="addSourceBtn" class="btn primary" type="button">Add Source</button>
+          <button id="loadDefaultConfigBtn" class="btn" type="button">Load Default Config</button>
+          <span id="sourceStatus" class="source-status"></span>
+        </div>
+        <ul id="sourceList" class="source-list"></ul>
+      </details>
+
+      <div class="meta">
+        <div id="currentCategory">Category: -</div>
+        <div id="progress">Loaded: 0 / 0</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th data-sort-key="symbol">Symbol<span class="sort-arrow"></span></th>
+              <th data-sort-key="name">Name<span class="sort-arrow"></span></th>
+              <th data-sort-key="price">Price<span class="sort-arrow"></span></th>
+              <th data-sort-key="change">Change<span class="sort-arrow"></span></th>
+              <th data-sort-key="pctChange">% Change<span class="sort-arrow"></span></th>
+              <th data-sort-key="rangePos">52-week Range<span class="sort-arrow"></span></th>
+              <th data-sort-key="oneY">1Y<span class="sort-arrow"></span></th>
+              <th data-sort-key="threeY">3Y<span class="sort-arrow"></span></th>
+              <th data-sort-key="fiveY">5Y<span class="sort-arrow"></span></th>
+              <th data-sort-key="tenY">10Y<span class="sort-arrow"></span></th>
+              <th data-sort-key="life">Life<span class="sort-arrow"></span></th>
+              <th data-sort-key="status">Status<span class="sort-arrow"></span></th>
+              <th class="col-remove" title="Remove row"></th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="foot">Source: Fidelity summary pages parsed from readable mirror. Values may be delayed and can fail for some symbols due to upstream throttling.</div>
+  </div>
+
+  <!-- hidden file input for local JSON files -->
+  <input id="fileInput" type="file" accept=".json" style="display:none" />
+
+  <script>
+    const DEFAULT_SOURCE_URL = "https://gist.githubusercontent.com/xb01/05900935c53adcea6dbc65426ff82bd5/raw/f1b6b38099c13bc2707cd7d48bc16b09a015116b/wf_explore_etfs_01.json";
+    const COOKIE_CONFIG_KEY = "marketConfig";
+
+    const cache = new Map();
+    const loadedSources = [];
+    let categories = [];
+    let renderToken = 0;
+    let activeCategoryIndex = 0;
+    let activeCategoryName = "";
+    let currentRows = [];          // { symbol, row } of currently displayed rows
+    let sortState = { key: "", dir: "asc" };
+    let currentLimit = 5;          // replaces the old <select>; Infinity = All
+    const hiddenSymbolsByCategory = new Map();
+    const removedCategories = new Set();
+
+    // DOM refs
+    const categoryButtons   = document.getElementById("categoryButtons");
+    const currentCategory   = document.getElementById("currentCategory");
+    const progressEl        = document.getElementById("progress");
+    const tableBody         = document.getElementById("tableBody");
+    const limitDisplay      = document.getElementById("limitDisplay");
+    const minus5Btn         = document.getElementById("minus5Btn");
+    const plus5Btn          = document.getElementById("plus5Btn");
+    const allBtn            = document.getElementById("allBtn");
+    const refreshBtn        = document.getElementById("refreshBtn");
+    const forceRefreshBtn   = document.getElementById("forceRefreshBtn");
+    const downloadConfigBtn = document.getElementById("downloadConfigBtn");
+    const saveConfigBtn     = document.getElementById("saveConfigBtn");
+    const clearConfigBtn    = document.getElementById("clearConfigBtn");
+    const sourceUrlInput    = document.getElementById("sourceUrlInput");
+    const addSourceBtn      = document.getElementById("addSourceBtn");
+    const loadDefaultConfigBtn = document.getElementById("loadDefaultConfigBtn");
+    const sourceStatus      = document.getElementById("sourceStatus");
+    const sourceList        = document.getElementById("sourceList");
+    const fileInput         = document.getElementById("fileInput");
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    function titleCase(s) {
+      return s.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+    }
+
+    function setProgress(done, total) {
+      progressEl.textContent = `Loaded: ${done} / ${total}`;
+    }
+
+    function valueClass(v) {
+      if (!v || v === "--") return "muted";
+      if (/^\+/.test(v)) return "pos";
+      if (/^-/.test(v))  return "neg";
+      return "";
+    }
+
+    function extractRegex(text, regex, group = 1, fallback = "--") {
+      const m = text.match(regex);
+      return m && m[group] ? m[group].trim() : fallback;
+    }
+
+    function extractReturn(section, label) {
+      const rx = new RegExp(`\\|\\s*${label}\\s*\\|\\s*([+-]?\\d+(?:\\.\\d+)?%)\\s*\\|`, "i");
+      return extractRegex(section, rx);
+    }
+
+    function toNumber(value) {
+      if (value == null) return null;
+      const n = Number(String(value).replace(/[,%$\s]/g, ""));
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function escapeHtml(v) {
+      return String(v || "")
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+
+    function fidelityUrl(symbol) {
+      return `https://digital.fidelity.com/prgw/digital/research/quote/dashboard/summary?symbol=${encodeURIComponent(symbol)}`;
+    }
+
+    function updateLimitDisplay() {
+      limitDisplay.textContent = Number.isFinite(currentLimit) ? String(currentLimit) : "All";
+    }
+
+    function selectedLimit(total) {
+      return Number.isFinite(currentLimit) ? Math.min(currentLimit, total) : total;
+    }
+
+    function setCookie(name, value, days = 365) {
+      const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
+      document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/`;
+    }
+
+    function deleteCookie(name) {
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+    }
+
+    function getHiddenSet(categoryName) {
+      if (!hiddenSymbolsByCategory.has(categoryName)) {
+        hiddenSymbolsByCategory.set(categoryName, new Set());
+      }
+      return hiddenSymbolsByCategory.get(categoryName);
+    }
+
+    function getVisibleEtfs(categoryName, etfs) {
+      const hidden = getHiddenSet(categoryName);
+      return (etfs || []).filter((s) => !hidden.has(s));
+    }
+
+    function statusCell(symbol, text, textClass) {
+      return `<span class="status-wrap"><span class="${textClass}">${escapeHtml(text)}</span><button class="row-refresh" title="Refresh ${escapeHtml(symbol)}" onclick="refreshRow('${escapeHtml(symbol)}')">↻</button></span>`;
+    }
+
+    // ── Fidelity markdown parser ──────────────────────────────────────────────
+
+    function parseFidelityMarkdown(md, symbol) {
+      const name      = extractRegex(md, /^Title:\s*[A-Z0-9.\-]+\s*-\s*(.+?)\s*\|/m);
+      const price     = extractRegex(md, /\n\$(\d[\d,]*\.\d{2})\n\n[A-Z]{2,5}\b/m, 1);
+      const change    = extractRegex(md, /\n\s*([+-]\d[\d,]*\.\d{2})\s*\n\n\s*\(([+-]\d+(?:\.\d+)?%)\)/m, 1);
+      const pctChange = extractRegex(md, /\n\s*([+-]\d[\d,]*\.\d{2})\s*\n\n\s*\(([+-]\d+(?:\.\d+)?%)\)/m, 2);
+
+      const rangeSection = extractRegex(
+        md,
+        /52-week range([\s\S]{0,1400}?)(?:Close dialog|## Detailed quote|## Overview|## Fund profile|## Chart)/i,
+        1, ""
+      );
+      let low52 = null, high52 = null;
+      if (rangeSection) {
+        const loM = rangeSection.match(/Low of\s*\$(\d[\d,]*\.\d{2})/i);
+        const hiM = rangeSection.match(/High of\s*\$(\d[\d,]*\.\d{2})/i);
+        if (loM && hiM) {
+          low52  = Number(loM[1].replace(/,/g, ""));
+          high52 = Number(hiM[1].replace(/,/g, ""));
+        } else {
+          const pairs = [...rangeSection.matchAll(/\$(\d[\d,]*\.\d{2})/g)]
+                          .map(m => Number(m[1].replace(/,/g, "")));
+          if (pairs.length >= 2) {
+            low52  = Math.min(pairs[0], pairs[1]);
+            high52 = Math.max(pairs[0], pairs[1]);
+          }
+        }
+      }
+
+      const range52 = (low52 !== null && high52 !== null)
+        ? `$${low52.toFixed(2)} - $${high52.toFixed(2)}` : "--";
+
+      const perfStart = md.search(/##\s+How is it performing\?/i);
+      const perfEnd   = md.search(/##\s+How is it structured\?/i);
+      const perfSec   = perfStart !== -1
+        ? md.slice(perfStart, perfEnd !== -1 ? perfEnd : perfStart + 1400) : "";
+
+      const oneY   = extractReturn(perfSec, "1 year");
+      const threeY = extractReturn(perfSec, "3 year");
+      const fiveY  = extractReturn(perfSec, "5 year");
+      const tenY   = extractReturn(perfSec, "10 year");
+      const life   = extractReturn(perfSec, "Life");
+
+      const profStart = md.search(/##\s+Fund profile/i);
+      const holdStart = md.search(/##\s+What is it holding\?/i);
+      const profSec   = profStart !== -1
+        ? md.slice(profStart, holdStart !== -1 ? holdStart : profStart + 800) : "";
+      const profile = profSec
+        .replace(/##\s+Fund profile/i, "")
+        .replace(/\[([^\]]*?)\]\([^)]*?\)/g, "$1")
+        .replace(/\s+/g, " ").trim().slice(0, 220);
+
+      return {
+        symbol,
+        name,
+        price:      price !== "--" ? `$${price}` : "--",
+        priceValue: price !== "--" ? Number(price.replace(/,/g, "")) : null,
+        change,
+        pctChange,
+        range52, low52, high52,
+        oneY, threeY, fiveY, tenY, life,
+        profile: profile || "--"
+      };
+    }
+
+    // ── Fetch with retry ─────────────────────────────────────────────────────
+
+    async function fetchEtf(symbol, options = {}) {
+      const { forceRefresh = false } = options;
+      if (!forceRefresh && cache.has(symbol)) return cache.get(symbol);
+
+      const url = `https://r.jina.ai/http://digital.fidelity.com/prgw/digital/research/quote/dashboard/summary?symbol=${encodeURIComponent(symbol)}`;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const ctrl = new AbortController();
+        const tid  = setTimeout(() => ctrl.abort(), 25000);
+        try {
+          const res = await fetch(url, { signal: ctrl.signal });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const parsed = parseFidelityMarkdown(await res.text(), symbol);
+          cache.set(symbol, parsed);
+          return parsed;
+        } catch (e) {
+          if (attempt === 3) throw e;
+          await new Promise(r => setTimeout(r, 500 * attempt));
+        } finally {
+          clearTimeout(tid);
+        }
+      }
+    }
+
+    // ── Range line rendering ─────────────────────────────────────────────────
+
+    function getRangePosition(data) {
+      const { low52: lo, high52: hi, priceValue: p } = data;
+      if (lo === null || hi === null || p === null || hi <= lo) return null;
+      return Math.max(0, Math.min(1, (p - lo) / (hi - lo)));
+    }
+
+    function renderRangeLine(data) {
+      const ratio = getRangePosition(data);
+      if (ratio === null) return escapeHtml(data.range52 || "--");
+      const { low52: lo, high52: hi, priceValue: p } = data;
+      const tip = p !== null ? `Current: $${p.toFixed(2)}` : "";
+      return `<div class="range-cell">
+        <div class="range-values"><span>$${lo.toFixed(2)}</span><span>$${hi.toFixed(2)}</span></div>
+        <div class="range-line"><span class="range-marker" title="${escapeHtml(tip)}" style="left:${ratio*100}%"></span></div>
+      </div>`;
+    }
+
+    // ── Row helpers ───────────────────────────────────────────────────────────
+
+    function removeBtn(symbol) {
+      return `<td><button class="row-remove" title="Remove ${escapeHtml(symbol)}" onclick="removeRowBySymbol('${escapeHtml(symbol)}')">×</button></td>`;
+    }
+
+    function createRow(symbol) {
+      const tr = document.createElement("tr");
+      tr.dataset.symbol = symbol;
+      tr.innerHTML = `
+        <td class="symbol"><a class="cell-link" href="${fidelityUrl(symbol)}" target="_blank" rel="noreferrer">${escapeHtml(symbol)}</a></td>
+        <td class="name muted">Loading…</td>
+        <td class="muted">--</td><td class="muted">--</td><td class="muted">--</td>
+        <td class="muted">--</td><td class="muted">--</td><td class="muted">--</td>
+        <td class="muted">--</td><td class="muted">--</td><td class="muted">--</td>
+        <td>${statusCell(symbol, "Loading", "loading")}</td>
+        ${removeBtn(symbol)}`;
+      tableBody.appendChild(tr);
+      return tr;
+    }
+
+    function updateRow(tr, data) {
+      const s = data.symbol;
+      tr.innerHTML = `
+        <td class="symbol"><a class="cell-link" href="${fidelityUrl(s)}" target="_blank" rel="noreferrer">${escapeHtml(s)}</a></td>
+        <td class="name" title="${escapeHtml(data.profile || "")}"><a class="cell-link" href="${fidelityUrl(s)}" target="_blank" rel="noreferrer">${escapeHtml(data.name || "--")}</a></td>
+        <td>${escapeHtml(data.price || "--")}</td>
+        <td class="${valueClass(data.change)}">${escapeHtml(data.change || "--")}</td>
+        <td class="${valueClass(data.pctChange)}">${escapeHtml(data.pctChange || "--")}</td>
+        <td>${renderRangeLine(data)}</td>
+        <td class="${valueClass(data.oneY)}">${escapeHtml(data.oneY || "--")}</td>
+        <td class="${valueClass(data.threeY)}">${escapeHtml(data.threeY || "--")}</td>
+        <td class="${valueClass(data.fiveY)}">${escapeHtml(data.fiveY || "--")}</td>
+        <td class="${valueClass(data.tenY)}">${escapeHtml(data.tenY || "--")}</td>
+        <td class="${valueClass(data.life)}">${escapeHtml(data.life || "--")}</td>
+        <td>${statusCell(s, "OK", "muted")}</td>
+        ${removeBtn(s)}`;
+    }
+
+    function setErrorRow(tr, symbol, err) {
+      tr.innerHTML = `
+        <td class="symbol"><a class="cell-link" href="${fidelityUrl(symbol)}" target="_blank" rel="noreferrer">${escapeHtml(symbol)}</a></td>
+        <td class="name muted">Data unavailable</td>
+        <td class="muted">--</td><td class="muted">--</td><td class="muted">--</td>
+        <td class="muted">--</td><td class="muted">--</td><td class="muted">--</td>
+        <td class="muted">--</td><td class="muted">--</td><td class="muted">--</td>
+        <td>${statusCell(symbol, String(err).slice(0, 60), "error")}</td>
+        ${removeBtn(symbol)}`;
+    }
+
+    // ── Row removal ───────────────────────────────────────────────────────────
+
+    function removeRowBySymbol(symbol) {
+      const idx = currentRows.findIndex(r => r.symbol === symbol);
+      if (idx < 0) return;
+
+      const cat = categories[activeCategoryIndex];
+      if (cat) {
+        getHiddenSet(cat.category).add(symbol);
+      }
+
+      currentRows[idx].row.remove();
+      currentRows.splice(idx, 1);
+      if (cat) {
+        const visibleTotal = getVisibleEtfs(cat.category, cat.etfs).length;
+        currentCategory.textContent =
+          `Category: ${titleCase(cat.category)} (${currentRows.length} of ${visibleTotal} ETFs)`;
+      }
+
+      renderCategoryButtons(true);
+    }
+
+    async function refreshRow(symbol) {
+      const item = currentRows.find((r) => r.symbol === symbol);
+      if (!item) return;
+      try {
+        item.row.querySelector("td:nth-child(12)").innerHTML = statusCell(symbol, "Loading", "loading");
+        const data = await fetchEtf(symbol, { forceRefresh: true });
+        updateRow(item.row, data);
+        applySortRows();
+      } catch (e) {
+        setErrorRow(item.row, symbol, e.message || e);
+      }
+    }
+
+    // ── Sorting ───────────────────────────────────────────────────────────────
+
+    function getSortValue(symbol, key) {
+      const d = cache.get(symbol);
+      if (!d) return null;
+      if (key === "symbol")   return String(symbol).toUpperCase();
+      if (key === "name")     return String(d.name || "").toUpperCase();
+      if (key === "price")    return d.priceValue;
+      if (key === "change")   return toNumber(d.change);
+      if (key === "pctChange")return toNumber(d.pctChange);
+      if (key === "rangePos") return getRangePosition(d);
+      if (key === "oneY")     return toNumber(d.oneY);
+      if (key === "threeY")   return toNumber(d.threeY);
+      if (key === "fiveY")    return toNumber(d.fiveY);
+      if (key === "tenY")     return toNumber(d.tenY);
+      if (key === "life")     return toNumber(d.life);
+      return null;
+    }
+
+    function applySortRows() {
+      if (!sortState.key || !currentRows.length) return;
+      const dir = sortState.dir === "asc" ? 1 : -1;
+      currentRows.sort((a, b) => {
+        const va = getSortValue(a.symbol, sortState.key);
+        const vb = getSortValue(b.symbol, sortState.key);
+        if (va === null && vb === null) return a.symbol.localeCompare(b.symbol);
+        if (va === null) return 1;
+        if (vb === null) return -1;
+        if (typeof va === "string") return va.localeCompare(String(vb)) * dir;
+        return (va === vb ? a.symbol.localeCompare(b.symbol) : (va > vb ? 1 : -1) * dir);
+      });
+      const frag = document.createDocumentFragment();
+      currentRows.forEach(r => frag.appendChild(r.row));
+      tableBody.appendChild(frag);
+    }
+
+    function refreshSortHeaderUi() {
+      document.querySelectorAll("thead th[data-sort-key]").forEach(th => {
+        const arrow = th.querySelector(".sort-arrow");
+        th.classList.toggle("active-sort", th.dataset.sortKey === sortState.key);
+        if (arrow) arrow.textContent = th.dataset.sortKey === sortState.key
+          ? (sortState.dir === "asc" ? "▲" : "▼") : "";
+      });
+    }
+
+    function bindSorting() {
+      document.querySelectorAll("thead th[data-sort-key]").forEach(th => {
+        th.addEventListener("click", () => {
+          if (sortState.key === th.dataset.sortKey) {
+            sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
+          } else {
+            sortState.key = th.dataset.sortKey;
+            sortState.dir = "asc";
+          }
+          refreshSortHeaderUi();
+          applySortRows();
+        });
+      });
+    }
+
+    // ── Render category ───────────────────────────────────────────────────────
+
+    async function renderCategory(index, options = {}) {
+      const { forceRefresh = false } = options;
+      renderToken++;
+      const token = renderToken;
+
+      activeCategoryIndex = index;
+      const cat = categories[index];
+      if (!cat) {
+        currentCategory.textContent = "Category: -";
+        tableBody.innerHTML = "";
+        setProgress(0, 0);
+        return;
+      }
+
+      activeCategoryName = cat.category;
+      const visibleEtfs = getVisibleEtfs(cat.category, cat.etfs);
+      const total   = visibleEtfs.length;
+      const count   = selectedLimit(total);
+      const symbols = visibleEtfs.slice(0, count);
+
+      tableBody.innerHTML = "";
+      currentRows = [];
+      currentCategory.textContent = `Category: ${titleCase(cat.category)} (${symbols.length} of ${total} ETFs)`;
+      setProgress(0, symbols.length);
+
+      const rowMap = new Map();
+      symbols.forEach(sym => {
+        const row = createRow(sym);
+        currentRows.push({ symbol: sym, row });
+        rowMap.set(sym, row);
+      });
+
+      applySortRows();
+
+      let done = 0;
+      const queue = [...symbols];
+
+      async function worker() {
+        while (queue.length) {
+          const sym = queue.shift();
+          if (!sym || token !== renderToken) return;
+          const row = rowMap.get(sym);
+          try {
+            const data = await fetchEtf(sym, { forceRefresh });
+            if (token !== renderToken) return;
+            updateRow(row, data);
+          } catch (e) {
+            if (token !== renderToken) return;
+            setErrorRow(row, sym, e.message || e);
+          }
+          done++;
+          setProgress(done, symbols.length);
+          applySortRows();
+        }
+      }
+      await Promise.all(Array.from({ length: 5 }, worker));
+    }
+
+    // ── Categories / sources ──────────────────────────────────────────────────
+
+    function rebuildCategoriesFromSources() {
+      const map = new Map();
+      loadedSources.forEach(src => {
+        src.categories.forEach(entry => {
+          const key = String(entry.category || "").trim();
+          if (!key) return;
+          if (!map.has(key)) map.set(key, new Set());
+          const set = map.get(key);
+          (entry.etfs || []).forEach(sym => { const c = String(sym || "").trim(); if (c) set.add(c); });
+        });
+      });
+      categories = Array.from(map.entries())
+        .map(([category, set]) => ({ category, etfs: [...set] }))
+        .filter((c) => !removedCategories.has(c.category));
+    }
+
+    function renderSourceList() {
+      sourceList.innerHTML = "";
+      if (!loadedSources.length) {
+        const li = document.createElement("li");
+        li.className = "source-item";
+        li.textContent = "No data sources loaded.";
+        sourceList.appendChild(li);
+        return;
+      }
+      loadedSources.forEach(src => {
+        const li   = document.createElement("li");  li.className = "source-item";
+        const span = document.createElement("span"); span.className = "source-url"; span.textContent = src.url;
+        const btn  = document.createElement("button");
+        btn.className = "remove-source"; btn.type = "button"; btn.title = "Remove source"; btn.textContent = "x";
+        btn.addEventListener("click", () => removeSource(src.url));
+        li.append(span, btn);
+        sourceList.appendChild(li);
+      });
+    }
+
+    function renderCategoryButtons(preserveActiveOnly = false) {
+      categoryButtons.innerHTML = "";
+      categories.forEach((item, idx) => {
+        const visibleCount = getVisibleEtfs(item.category, item.etfs).length;
+        const chip = document.createElement("div");
+        chip.className = "cat-chip";
+
+        const btn = document.createElement("button");
+        btn.className = "cat-btn";
+        btn.textContent = `${titleCase(item.category)} (${visibleCount})`;
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".cat-btn").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          renderCategory(idx, { forceRefresh: false });
+        });
+
+        const remove = document.createElement("button");
+        remove.className = "cat-remove";
+        remove.type = "button";
+        remove.title = `Remove ${item.category}`;
+        remove.textContent = "x";
+        remove.addEventListener("click", (e) => {
+          e.stopPropagation();
+          removeCategory(item.category);
+        });
+
+        chip.appendChild(btn);
+        chip.appendChild(remove);
+        categoryButtons.appendChild(chip);
+      });
+
+      if (!categories.length) {
+        tableBody.innerHTML = "";
+        currentCategory.textContent = "Category: -";
+        setProgress(0, 0);
+        return;
+      }
+
+      let targetIndex = categories.findIndex(c => c.category === activeCategoryName);
+      if (targetIndex < 0) targetIndex = Math.min(activeCategoryIndex, categories.length - 1);
+      if (targetIndex < 0) targetIndex = 0;
+
+      const btns = categoryButtons.querySelectorAll(".cat-btn");
+      if (btns[targetIndex]) btns[targetIndex].classList.add("active");
+      if (!preserveActiveOnly) {
+        renderCategory(targetIndex, { forceRefresh: false });
+      }
+    }
+
+    function removeCategory(categoryName) {
+      removedCategories.add(categoryName);
+      hiddenSymbolsByCategory.delete(categoryName);
+      categories = categories.filter((c) => c.category !== categoryName);
+      renderCategoryButtons();
+      sourceStatus.textContent = `Removed category: ${categoryName}`;
+    }
+
+    function persistSourceUrls() {
+      localStorage.setItem("etfDataSources", JSON.stringify(loadedSources.map(s => s.url)));
+    }
+
+    function refreshLoadDefaultButtonState() {
+      const defaultLoaded = loadedSources.some((s) => s.url === DEFAULT_SOURCE_URL);
+      loadDefaultConfigBtn.disabled = defaultLoaded;
+      loadDefaultConfigBtn.textContent = defaultLoaded ? "Default Loaded" : "Load Default Config";
+    }
+
+    // ── Add / remove sources ──────────────────────────────────────────────────
+
+    async function fetchSourceData(url) {
+      // Direct fetch — works for http(s) and, for file:// origins, file:// URLs
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
+      } catch (e) {
+        throw new Error(`Cannot fetch ${url}: ${e.message}`);
+      }
+    }
+
+    async function loadDataFromFile(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => {
+          try { resolve(JSON.parse(e.target.result)); }
+          catch (pe) { reject(new Error("Invalid JSON: " + pe.message)); }
+        };
+        reader.onerror = () => reject(new Error("File read error"));
+        reader.readAsText(file);
+      });
+    }
+
+    async function addSource(sourceUrl, dataOverride = null) {
+      const url = String(sourceUrl || "").trim();
+      if (!url) throw new Error("Source URL is empty");
+      if (loadedSources.some(s => s.url === url)) {
+        sourceStatus.textContent = "Source already added.";
+        return;
+      }
+
+      sourceStatus.textContent = `Adding: ${url}`;
+      let data;
+      if (dataOverride) {
+        data = dataOverride;
+      } else if (url.startsWith("file://")) {
+        // Trigger file picker — user selects the local file
+        sourceStatus.textContent = `Local file detected — select file in dialog…`;
+        data = await new Promise((resolve, reject) => {
+          fileInput.value = "";
+          fileInput.onchange = async (ev) => {
+            const file = ev.target.files[0];
+            if (!file) { reject(new Error("No file selected")); return; }
+            try { resolve(await loadDataFromFile(file)); }
+            catch (e) { reject(e); }
+          };
+          fileInput.click();
+        });
+      } else {
+        data = await fetchSourceData(url);
+      }
+
+      const parsed = data.wealthfront_explore_etfs || [];
+      if (!parsed.length) throw new Error("No categories found in source");
+
+      loadedSources.push({ url, categories: parsed });
+      persistSourceUrls();
+      rebuildCategoriesFromSources();
+      renderSourceList();
+      renderCategoryButtons();
+      refreshLoadDefaultButtonState();
+      sourceStatus.textContent = `Added. ${loadedSources.length} source(s) loaded.`;
+    }
+
+    function removeSource(url) {
+      const idx = loadedSources.findIndex(s => s.url === url);
+      if (idx < 0) return;
+      loadedSources.splice(idx, 1);
+      persistSourceUrls();
+      rebuildCategoriesFromSources();
+      renderSourceList();
+      renderCategoryButtons();
+      refreshLoadDefaultButtonState();
+      sourceStatus.textContent = `Removed. ${loadedSources.length} source(s) loaded.`;
+    }
+
+    // ── Save config ───────────────────────────────────────────────────────────
+
+    function buildConfigPayload() {
+      const snapshot = categories.map((cat, idx) => {
+        return { category: cat.category, etfs: getVisibleEtfs(cat.category, cat.etfs) };
+      });
+      return {
+        wealthfront_explore_etfs: snapshot,
+        market_dashboard_meta: {
+          source_urls: loadedSources.map((s) => s.url),
+          current_limit: Number.isFinite(currentLimit) ? currentLimit : "all",
+          removed_categories: Array.from(removedCategories),
+          hidden_symbols_by_category: Object.fromEntries(
+            Array.from(hiddenSymbolsByCategory.entries()).map(([k, v]) => [k, Array.from(v)])
+          )
+        }
+      };
+    }
+
+    function downloadConfig() {
+      const payload = buildConfigPayload();
+      const blob = new Blob(
+        [JSON.stringify(payload, null, 2)],
+        { type: "application/json" }
+      );
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `market-config-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function saveConfig() {
+      const payload = buildConfigPayload();
+      setCookie(COOKIE_CONFIG_KEY, JSON.stringify(payload));
+      sourceStatus.textContent = "Configuration saved in cookie.";
+    }
+
+    function clearConfig() {
+      deleteCookie(COOKIE_CONFIG_KEY);
+      sourceStatus.textContent = "Saved configuration cookie cleared.";
+    }
+
+    // ── URL hash sources ──────────────────────────────────────────────────────
+
+    function getHashSources() {
+      // Supports: #ds=url1,url2  (comma-separated full URLs)
+      const hash = decodeURIComponent(location.hash);
+      const m = hash.match(/[#&]ds=(.+)/);
+      if (!m) return null;
+      return m[1].split(",").map(u => u.trim()).filter(Boolean);
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+
+    async function initSources() {
+      const hashUrls = getHashSources();
+
+      let urls;
+      if (hashUrls && hashUrls.length) {
+        // Hash sources take priority; persist them for next session
+        urls = hashUrls;
+        localStorage.setItem("etfDataSources", JSON.stringify(urls));
+      } else {
+        const raw = localStorage.getItem("etfDataSources");
+        try { urls = raw ? JSON.parse(raw) : []; } catch { urls = []; }
+        if (!Array.isArray(urls) || !urls.length) urls = [DEFAULT_SOURCE_URL];
+      }
+
+      let ok = 0;
+      for (const url of urls) {
+        try { await addSource(url); ok++; }
+        catch (e) { sourceStatus.textContent = `Skipped: ${url} — ${e.message}`; }
+      }
+      if (!ok) {
+        try { await addSource("./wfall-01.json"); }
+        catch (e) {
+          currentCategory.textContent = "Category: Error";
+          sourceStatus.textContent = `All sources failed: ${e.message}`;
+        }
+      }
+    }
+
+    // ── Event listeners ───────────────────────────────────────────────────────
+
+    minus5Btn.addEventListener("click", () => {
+      if (!Number.isFinite(currentLimit)) {
+        const cat = categories[activeCategoryIndex];
+        currentLimit = cat ? Math.max(5, cat.etfs.length - 5) : 5;
+      } else {
+        currentLimit = Math.max(5, currentLimit - 5);
+      }
+      updateLimitDisplay();
+      if (categories.length) renderCategory(activeCategoryIndex, { forceRefresh: false });
+    });
+
+    plus5Btn.addEventListener("click", () => {
+      if (!Number.isFinite(currentLimit)) return; // already All
+      currentLimit += 5;
+      updateLimitDisplay();
+      if (categories.length) renderCategory(activeCategoryIndex, { forceRefresh: false });
+    });
+
+    allBtn.addEventListener("click", () => {
+      currentLimit = Infinity;
+      updateLimitDisplay();
+      if (categories.length) renderCategory(activeCategoryIndex, { forceRefresh: false });
+    });
+
+    refreshBtn.addEventListener("click", () => {
+      if (categories.length) renderCategory(activeCategoryIndex, { forceRefresh: false });
+    });
+
+    forceRefreshBtn.addEventListener("click", () => {
+      if (categories.length) renderCategory(activeCategoryIndex, { forceRefresh: true });
+    });
+
+    downloadConfigBtn.addEventListener("click", downloadConfig);
+    saveConfigBtn.addEventListener("click", saveConfig);
+    clearConfigBtn.addEventListener("click", clearConfig);
+
+    addSourceBtn.addEventListener("click", async () => {
+      try {
+        const url = sourceUrlInput.value.trim();
+        await addSource(url);
+        if (!url.startsWith("file://")) sourceUrlInput.value = "";
+      } catch (e) {
+        sourceStatus.textContent = e.message || String(e);
+      }
+    });
+
+    sourceUrlInput.addEventListener("keydown", async (e) => {
+      if (e.key === "Enter") addSourceBtn.click();
+    });
+
+    loadDefaultConfigBtn.addEventListener("click", async () => {
+      if (loadedSources.some((s) => s.url === DEFAULT_SOURCE_URL)) {
+        sourceStatus.textContent = "Default config already loaded.";
+        refreshLoadDefaultButtonState();
+        return;
+      }
+      try {
+        await addSource(DEFAULT_SOURCE_URL);
+        sourceStatus.textContent = "Default config loaded.";
+      } catch (e) {
+        sourceStatus.textContent = e.message || String(e);
+      }
+    });
+
+    async function init() {
+      bindSorting();
+      refreshSortHeaderUi();
+      updateLimitDisplay();
+      renderSourceList();
+      refreshLoadDefaultButtonState();
+      try { await initSources(); }
+      catch (e) {
+        currentCategory.textContent = "Category: Error";
+        progressEl.textContent = e.message || String(e);
+      }
+    }
+
+    init();
+
+    // expose row refresh/remove handlers used by inline buttons
+    window.refreshRow = refreshRow;
+    window.removeRowBySymbol = removeRowBySymbol;
+  </script>
+</body>
+</html>

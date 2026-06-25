@@ -19,6 +19,10 @@
 ### api key encrypt/decrypt
 [https://xlabsinc.github.io/pub/apikey/apikey.html](https://xlabsinc.github.io/pub/apikey/apikey.html "API Key Encrypt/Decrypt - Send API keys via text message")
 
+### stock market equities, etfs, funds performance dashboard
+[https://xlabsinc.github.io/pub/market/perf-dash.html](https://xlabsinc.github.io/pub/market/perf-dash.html "Equities, ETF, Funds performance dashboard")
+
+#
 ### Investment Interactive Dashboard
 [https://xlabsinc.github.io/pub/investment-dashboard/dashboard.html](https://xlabsinc.github.io/pub/investment-dashboard/dashboard.html "Investment Intelligence Dashboard  - Interactive portfolio growth, risk, allocation, and forecast analysis")
 
