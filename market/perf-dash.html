@@ -1967,25 +1967,37 @@
       sourceStatus.textContent = "Saved configuration cookie cleared.";
     }
 
-    // ── URL hash sources ──────────────────────────────────────────────────────
+    // ── Deep-link URL sources ─────────────────────────────────────────────────
 
-    function getHashSources() {
-      // Supports: #ds=url1,url2  (comma-separated full URLs)
-      const hash = decodeURIComponent(location.hash);
-      const m = hash.match(/[#&]ds=(.+)/);
-      if (!m) return null;
-      return m[1].split(",").map(u => u.trim()).filter(Boolean);
+    function splitCsvParamValues(values) {
+      return values
+        .flatMap((v) => String(v || "").split(","))
+        .map((u) => u.trim())
+        .filter(Boolean);
+    }
+
+    function getDeepLinkSources() {
+      // Supports:
+      // - ?url=https://a.json,https://b.json
+      // - ?url=https://a.json&url=https://b.json
+      // - #url=https://a.json,https://b.json
+      // - #url=https://a.json&url=https://b.json
+      const fromSearch = splitCsvParamValues(new URLSearchParams(location.search).getAll("url"));
+      const hashRaw = location.hash.startsWith("#") ? location.hash.slice(1) : location.hash;
+      const fromHash = splitCsvParamValues(new URLSearchParams(hashRaw).getAll("url"));
+      const combined = [...fromSearch, ...fromHash];
+      return [...new Set(combined)];
     }
 
     // ── Init ──────────────────────────────────────────────────────────────────
 
     async function initSources() {
-      const hashUrls = getHashSources();
+      const deepLinkUrls = getDeepLinkSources();
 
       let urls;
-      if (hashUrls && hashUrls.length) {
-        // Hash sources take priority; persist them for next session
-        urls = hashUrls;
+      if (deepLinkUrls.length) {
+        // Deep-link sources take priority; persist them for next session.
+        urls = deepLinkUrls;
         localStorage.setItem("etfDataSources", JSON.stringify(urls));
       } else {
         const raw = localStorage.getItem("etfDataSources");
