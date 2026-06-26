@@ -132,6 +132,10 @@
 
     .source-status { font-size: 0.82rem; color: var(--muted); }
 
+    .provider-note { font-size: 0.78rem; color: var(--muted); margin: 8px 0 4px; line-height: 1.35; }
+    .provider-toggle { display: inline-flex; align-items: center; gap: 8px; flex: 1; cursor: pointer; }
+    .provider-key { min-width: 150px; max-width: 240px; }
+
     .help-modal {
       border: 1px solid var(--line);
       border-radius: 12px;
@@ -419,6 +423,23 @@
         <ul id="sourceList" class="source-list"></ul>
       </details>
 
+      <details class="sources">
+        <summary>Reader Providers (load balancing)</summary>
+        <div class="provider-note">
+          Requests round-robin across enabled providers and fail over on error.
+          Providers must return Jina-style markdown. Add self-hosted Jina
+          instances to genuinely distribute load. Keys are stored in this
+          browser's localStorage.
+        </div>
+        <ul id="providerList" class="source-list"></ul>
+        <div class="control-row" style="margin-top:8px;">
+          <input id="providerLabelInput" class="input filter-input" type="text" placeholder="Label (optional)" />
+          <input id="providerUrlInput" class="input" type="text" placeholder="Self-hosted Jina base URL (https://reader.example.com)" />
+          <button id="addProviderBtn" class="btn primary" type="button">Add Provider</button>
+          <span id="providerStatus" class="source-status"></span>
+        </div>
+      </details>
+
       <div class="meta">
         <div class="category-meta">
           <div id="currentCategory">Category: -</div>
@@ -571,6 +592,11 @@
     const activityText      = document.getElementById("activityText");
     const sourceStatus      = document.getElementById("sourceStatus");
     const sourceList        = document.getElementById("sourceList");
+    const providerList      = document.getElementById("providerList");
+    const providerLabelInput = document.getElementById("providerLabelInput");
+    const providerUrlInput  = document.getElementById("providerUrlInput");
+    const addProviderBtn    = document.getElementById("addProviderBtn");
+    const providerStatus    = document.getElementById("providerStatus");
     const fileInput         = document.getElementById("fileInput");
     let prefetchToken = 0;
     let activityCount = 0;
@@ -986,6 +1012,103 @@
 
     function enabledProviders() {
       return READER_PROVIDERS.filter((p) => p.enabled && (!("key" in p) || p.key));
+    }
+
+    // ── Provider settings (persisted, user-managed) ───────────────────────────
+
+    const PROVIDER_SETTINGS_KEY = "readerProviders";
+    let customProviderSeq = 0;
+
+    function addCustomProvider({ id, label, base, enabled = true }, persist = true) {
+      if (!base) return null;
+      const provider = {
+        id: id || `custom-${++customProviderSeq}`,
+        label: label || base,
+        base,
+        custom: true,
+        enabled: Boolean(enabled),
+        build: function (t) { return `${String(this.base).replace(/\/+$/, "")}/${t}`; },
+      };
+      const n = parseInt(String(provider.id).replace(/\D/g, ""), 10);
+      if (Number.isFinite(n) && n > customProviderSeq) customProviderSeq = n;
+      READER_PROVIDERS.push(provider);
+      if (persist) saveProviderSettings();
+      return provider;
+    }
+
+    function loadProviderSettings() {
+      let saved = {};
+      try { saved = JSON.parse(localStorage.getItem(PROVIDER_SETTINGS_KEY) || "{}") || {}; }
+      catch { saved = {}; }
+      READER_PROVIDERS.forEach((p) => {
+        const s = saved[p.id];
+        if (!s) return;
+        if (typeof s.enabled === "boolean") p.enabled = s.enabled;
+        if ("key" in p && typeof s.key === "string") p.key = s.key;
+      });
+      (Array.isArray(saved.custom) ? saved.custom : []).forEach((c) => addCustomProvider(c, false));
+    }
+
+    function saveProviderSettings() {
+      const obj = { custom: [] };
+      READER_PROVIDERS.forEach((p) => {
+        if (p.custom) {
+          obj.custom.push({ id: p.id, label: p.label, base: p.base, enabled: p.enabled });
+        } else {
+          obj[p.id] = { enabled: p.enabled };
+          if ("key" in p) obj[p.id].key = p.key || "";
+        }
+      });
+      try { localStorage.setItem(PROVIDER_SETTINGS_KEY, JSON.stringify(obj)); }
+      catch { /* storage unavailable */ }
+    }
+
+    function renderProviderList() {
+      providerList.innerHTML = "";
+      READER_PROVIDERS.forEach((p) => {
+        const li = document.createElement("li");
+        li.className = "source-item";
+
+        const toggle = document.createElement("label");
+        toggle.className = "provider-toggle";
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = Boolean(p.enabled);
+        cb.addEventListener("change", () => { p.enabled = cb.checked; saveProviderSettings(); });
+        const name = document.createElement("span");
+        name.className = "source-url";
+        name.textContent = p.custom ? `${p.label} — ${p.base}`
+          : ("key" in p ? `${p.label} (API key)` : `${p.label} (free)`);
+        toggle.append(cb, name);
+        li.appendChild(toggle);
+
+        if ("key" in p) {
+          const keyInput = document.createElement("input");
+          keyInput.type = "password";
+          keyInput.className = "input provider-key";
+          keyInput.placeholder = "API key";
+          keyInput.value = p.key || "";
+          keyInput.addEventListener("change", () => { p.key = keyInput.value.trim(); saveProviderSettings(); });
+          li.appendChild(keyInput);
+        }
+
+        if (p.custom) {
+          const rm = document.createElement("button");
+          rm.className = "remove-source";
+          rm.type = "button";
+          rm.title = "Remove provider";
+          rm.textContent = "x";
+          rm.addEventListener("click", () => {
+            const idx = READER_PROVIDERS.indexOf(p);
+            if (idx >= 0) READER_PROVIDERS.splice(idx, 1);
+            saveProviderSettings();
+            renderProviderList();
+          });
+          li.appendChild(rm);
+        }
+
+        providerList.appendChild(li);
+      });
     }
 
     let providerCursor = 0;
@@ -1986,6 +2109,20 @@
 
     addSymbolsBtn.addEventListener("click", addSymbolsToActiveCategory);
 
+    addProviderBtn.addEventListener("click", () => {
+      const label = providerLabelInput.value.trim();
+      const base = providerUrlInput.value.trim();
+      if (!/^https?:\/\//i.test(base)) {
+        providerStatus.textContent = "Enter a base URL starting with http(s)://";
+        return;
+      }
+      addCustomProvider({ label, base, enabled: true });
+      providerLabelInput.value = "";
+      providerUrlInput.value = "";
+      providerStatus.textContent = "Provider added.";
+      renderProviderList();
+    });
+
     loadDefaultConfigBtn.addEventListener("click", async () => {
       if (loadedSources.some((s) => s.url === DEFAULT_SOURCE_URL)) {
         sourceStatus.textContent = "Default config already loaded.";
@@ -2003,11 +2140,13 @@
     async function init() {
       beginActivity("Initializing dashboard...");
       loadPersistentCache();
+      loadProviderSettings();
       bindSorting();
       bindRowActions();
       refreshSortHeaderUi();
       updateLimitDisplay();
       renderSourceList();
+      renderProviderList();
       renderCategoryButtons(true);
       refreshLoadDefaultButtonState();
       try {
