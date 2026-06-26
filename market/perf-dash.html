@@ -650,7 +650,7 @@
     }
 
     function statusCell(symbol, text, textClass) {
-      return `<span class="status-wrap"><span class="${textClass}">${escapeHtml(text)}</span><button class="row-refresh" title="Refresh ${escapeHtml(symbol)}" onclick="refreshRow('${escapeHtml(symbol)}')">↻</button></span>`;
+      return `<span class="status-wrap"><span class="${textClass}">${escapeHtml(text)}</span><button class="row-refresh" type="button" title="Refresh ${escapeHtml(symbol)}" data-action="refresh" data-symbol="${escapeHtml(symbol)}">↻</button></span>`;
     }
 
     function renderSymbolStatus(symbol, fallbackText, fallbackClass) {
@@ -955,7 +955,7 @@
     // ── Row helpers ───────────────────────────────────────────────────────────
 
     function removeBtn(symbol) {
-      return `<td><button class="row-remove" title="Remove ${escapeHtml(symbol)}" onclick="removeRowBySymbol('${escapeHtml(symbol)}')">×</button></td>`;
+      return `<td><button class="row-remove" type="button" title="Remove ${escapeHtml(symbol)}" data-action="remove" data-symbol="${escapeHtml(symbol)}">×</button></td>`;
     }
 
     function createRow(symbol) {
@@ -1100,6 +1100,17 @@
           refreshSortHeaderUi();
           applySortRows();
         });
+      });
+    }
+
+    function bindRowActions() {
+      tableBody.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-action]");
+        if (!btn || !tableBody.contains(btn)) return;
+        const symbol = btn.dataset.symbol;
+        if (!symbol) return;
+        if (btn.dataset.action === "refresh") refreshRow(symbol);
+        else if (btn.dataset.action === "remove") removeRowBySymbol(symbol);
       });
     }
 
@@ -1776,6 +1787,7 @@
       beginActivity("Initializing dashboard...");
       loadPersistentCache();
       bindSorting();
+      bindRowActions();
       refreshSortHeaderUi();
       updateLimitDisplay();
       renderSourceList();
@@ -1794,10 +1806,6 @@
     }
 
     init();
-
-    // expose row refresh/remove handlers used by inline buttons
-    window.refreshRow = refreshRow;
-    window.removeRowBySymbol = removeRowBySymbol;
   </script>
 </body>
 </html>
