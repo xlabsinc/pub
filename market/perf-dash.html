@@ -841,9 +841,12 @@
       persistTimer = setTimeout(() => {
         persistTimer = null;
         try {
+          const now = Date.now();
           const obj = {};
           cache.forEach((d, sym) => {
-            obj[sym] = { t: cacheTime.get(sym) || Date.now(), d };
+            const t = cacheTime.get(sym) || now;
+            // Drop entries past their TTL so localStorage doesn't grow unbounded.
+            if (now - t < CACHE_TTL_MS) obj[sym] = { t, d };
           });
           localStorage.setItem(PERSIST_CACHE_KEY, JSON.stringify(obj));
         } catch {
