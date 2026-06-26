@@ -39,6 +39,16 @@
 
     .buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 
+    .btn.icon {
+      border-radius: 999px;
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      font-size: 1rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
     .cat-chip {
       display: inline-flex;
       align-items: center;
@@ -121,9 +131,58 @@
 
     .source-status { font-size: 0.82rem; color: var(--muted); }
 
+    .help-modal {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      width: min(760px, 92vw);
+      padding: 14px;
+      box-shadow: 0 14px 36px rgba(20, 40, 60, 0.24);
+      color: #1f3448;
+    }
+
+    .help-modal::backdrop {
+      background: rgba(10, 20, 30, 0.45);
+    }
+
+    .help-modal h3 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+      color: #17384e;
+    }
+
+    .help-modal p {
+      margin: 8px 0;
+      font-size: 0.9rem;
+      color: #2f4a5e;
+    }
+
+    .help-modal pre {
+      margin: 8px 0;
+      background: #f2f7fc;
+      border: 1px solid #d4e0ec;
+      border-radius: 10px;
+      padding: 10px;
+      overflow: auto;
+      font-size: 0.8rem;
+      color: #223b50;
+    }
+
+    .help-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 10px;
+    }
+
     .meta {
       display: flex; justify-content: space-between; align-items: center;
       gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 0.9rem;
+    }
+
+    .category-meta {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
     }
 
     .card {
@@ -239,16 +298,21 @@
       <details class="sources">
         <summary>Manage Data Sources</summary>
         <div class="control-row" style="margin-top:8px;">
-          <input id="sourceUrlInput" class="input" type="text" placeholder="Paste JSON URL or type file:// to browse local file" />
-          <button id="addSourceBtn" class="btn primary" type="button">Add Source</button>
+          <button id="sourcesHelpBtn" class="btn icon" type="button" title="How to use sources">?</button>
           <button id="loadDefaultConfigBtn" class="btn" type="button">Load Default Config</button>
+          <input id="sourceUrlInput" class="input" type="text" placeholder="Paste JSON URL" />
+          <button id="addUrlBtn" class="btn primary" type="button">Add Url</button>
+          <button id="addLocalFileBtn" class="btn primary" type="button">Add local file</button>
           <span id="sourceStatus" class="source-status"></span>
         </div>
         <ul id="sourceList" class="source-list"></ul>
       </details>
 
       <div class="meta">
-        <div id="currentCategory">Category: -</div>
+        <div class="category-meta">
+          <div id="currentCategory">Category: -</div>
+          <button id="addSymbolsBtn" class="btn" type="button">Add Symbols</button>
+        </div>
         <div id="progress">Loaded: 0 / 0</div>
       </div>
     </div>
@@ -284,8 +348,32 @@
   <!-- hidden file input for local JSON files -->
   <input id="fileInput" type="file" accept=".json" style="display:none" />
 
+  <dialog id="sourcesHelpDialog" class="help-modal">
+    <h3>Manage Sources Help</h3>
+    <p>1. Use Add Url for a remote HTTP or HTTPS JSON file.</p>
+    <p>2. Use Add local file to pick a JSON file from your machine.</p>
+    <p>3. Load Default Config adds the default portfolio source URL.</p>
+    <p>Expected JSON structure:</p>
+    <pre>{
+  "portfolio": [
+    {
+      "category": "my_category",
+      "symbols": ["META", "AMZN", "GOOG"]
+    },
+    {
+      "category": "another_category",
+      "symbols": ["SPY", "QQQ"]
+    }
+  ]
+}</pre>
+    <div class="help-actions">
+      <button id="closeSourcesHelpBtn" class="btn" type="button">Close</button>
+    </div>
+  </dialog>
+
   <script>
-    const DEFAULT_SOURCE_URL = "https://gist.githubusercontent.com/xb01/05900935c53adcea6dbc65426ff82bd5/raw/f1b6b38099c13bc2707cd7d48bc16b09a015116b/wf_explore_etfs_01.json";
+    const DEFAULT_SOURCE_URL = "https://gist.githubusercontent.com/xb01/366f7ffb205b2234b14c19a4d05adf8a/raw/a3ebbc731501825ef8539d1bd0311463b3cc0152/default_portfolio.json";
+    const CUSTOM_SOURCE_URL = "local://custom-categories";
     const COOKIE_CONFIG_KEY = "marketConfig";
 
     const cache = new Map();
@@ -299,6 +387,7 @@
     let currentLimit = 5;          // replaces the old <select>; Infinity = All
     const hiddenSymbolsByCategory = new Map();
     const removedCategories = new Set();
+    const customCategories = new Map();
 
     // DOM refs
     const categoryButtons   = document.getElementById("categoryButtons");
@@ -315,8 +404,13 @@
     const saveConfigBtn     = document.getElementById("saveConfigBtn");
     const clearConfigBtn    = document.getElementById("clearConfigBtn");
     const sourceUrlInput    = document.getElementById("sourceUrlInput");
-    const addSourceBtn      = document.getElementById("addSourceBtn");
+    const addUrlBtn         = document.getElementById("addUrlBtn");
+    const addLocalFileBtn   = document.getElementById("addLocalFileBtn");
     const loadDefaultConfigBtn = document.getElementById("loadDefaultConfigBtn");
+    const addSymbolsBtn     = document.getElementById("addSymbolsBtn");
+    const sourcesHelpBtn    = document.getElementById("sourcesHelpBtn");
+    const sourcesHelpDialog = document.getElementById("sourcesHelpDialog");
+    const closeSourcesHelpBtn = document.getElementById("closeSourcesHelpBtn");
     const sourceStatus      = document.getElementById("sourceStatus");
     const sourceList        = document.getElementById("sourceList");
     const fileInput         = document.getElementById("fileInput");
@@ -325,6 +419,17 @@
 
     function titleCase(s) {
       return s.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+    }
+
+    function parseSymbolsInput(raw) {
+      return String(raw || "")
+        .split(",")
+        .map((sym) => sym.trim().toUpperCase())
+        .filter(Boolean);
+    }
+
+    function normalizeCategoryInput(raw) {
+      return String(raw || "").trim().replace(/\s+/g, "_").toLowerCase();
     }
 
     function setProgress(done, total) {
@@ -388,9 +493,21 @@
       return hiddenSymbolsByCategory.get(categoryName);
     }
 
-    function getVisibleEtfs(categoryName, etfs) {
+    function getVisibleEtfs(categoryName, symbols) {
       const hidden = getHiddenSet(categoryName);
-      return (etfs || []).filter((s) => !hidden.has(s));
+      return (symbols || []).filter((s) => !hidden.has(s));
+    }
+
+    function normalizePortfolioData(data) {
+      const entries = Array.isArray(data?.portfolio) ? data.portfolio : [];
+
+      return entries.map((entry) => {
+        const category = String(entry?.category || "").trim();
+        const symbols = (Array.isArray(entry?.symbols) ? entry.symbols : [])
+          .map((sym) => String(sym || "").trim())
+          .filter(Boolean);
+        return { category, symbols };
+      }).filter((entry) => entry.category && entry.symbols.length);
     }
 
     function statusCell(symbol, text, textClass) {
@@ -571,7 +688,7 @@
       currentRows[idx].row.remove();
       currentRows.splice(idx, 1);
       if (cat) {
-        const visibleTotal = getVisibleEtfs(cat.category, cat.etfs).length;
+        const visibleTotal = getVisibleEtfs(cat.category, cat.symbols).length;
         currentCategory.textContent =
           `Category: ${titleCase(cat.category)} (${currentRows.length} of ${visibleTotal} ETFs)`;
       }
@@ -669,7 +786,7 @@
       }
 
       activeCategoryName = cat.category;
-      const visibleEtfs = getVisibleEtfs(cat.category, cat.etfs);
+      const visibleEtfs = getVisibleEtfs(cat.category, cat.symbols);
       const total   = visibleEtfs.length;
       const count   = selectedLimit(total);
       const symbols = visibleEtfs.slice(0, count);
@@ -722,24 +839,30 @@
           if (!key) return;
           if (!map.has(key)) map.set(key, new Set());
           const set = map.get(key);
-          (entry.etfs || []).forEach(sym => { const c = String(sym || "").trim(); if (c) set.add(c); });
+          (entry.symbols || []).forEach(sym => { const c = String(sym || "").trim(); if (c) set.add(c); });
         });
       });
+      customCategories.forEach((symbols, category) => {
+        if (!map.has(category)) map.set(category, new Set());
+        const set = map.get(category);
+        symbols.forEach((sym) => set.add(sym));
+      });
       categories = Array.from(map.entries())
-        .map(([category, set]) => ({ category, etfs: [...set] }))
+        .map(([category, set]) => ({ category, symbols: [...set] }))
         .filter((c) => !removedCategories.has(c.category));
     }
 
     function renderSourceList() {
       sourceList.innerHTML = "";
-      if (!loadedSources.length) {
+      const visibleSources = loadedSources.filter((src) => src.url !== CUSTOM_SOURCE_URL);
+      if (!visibleSources.length) {
         const li = document.createElement("li");
         li.className = "source-item";
         li.textContent = "No data sources loaded.";
         sourceList.appendChild(li);
         return;
       }
-      loadedSources.forEach(src => {
+      visibleSources.forEach(src => {
         const li   = document.createElement("li");  li.className = "source-item";
         const span = document.createElement("span"); span.className = "source-url"; span.textContent = src.url;
         const btn  = document.createElement("button");
@@ -753,7 +876,7 @@
     function renderCategoryButtons(preserveActiveOnly = false) {
       categoryButtons.innerHTML = "";
       categories.forEach((item, idx) => {
-        const visibleCount = getVisibleEtfs(item.category, item.etfs).length;
+        const visibleCount = getVisibleEtfs(item.category, item.symbols).length;
         const chip = document.createElement("div");
         chip.className = "cat-chip";
 
@@ -781,6 +904,14 @@
         categoryButtons.appendChild(chip);
       });
 
+      const addChip = document.createElement("button");
+      addChip.className = "btn icon primary";
+      addChip.type = "button";
+      addChip.title = "Add category";
+      addChip.textContent = "+";
+      addChip.addEventListener("click", addCategory);
+      categoryButtons.appendChild(addChip);
+
       if (!categories.length) {
         tableBody.innerHTML = "";
         currentCategory.textContent = "Category: -";
@@ -802,13 +933,85 @@
     function removeCategory(categoryName) {
       removedCategories.add(categoryName);
       hiddenSymbolsByCategory.delete(categoryName);
+      customCategories.delete(categoryName);
       categories = categories.filter((c) => c.category !== categoryName);
       renderCategoryButtons();
       sourceStatus.textContent = `Removed category: ${categoryName}`;
     }
 
+    function ensureCustomSourceEntry() {
+      if (!loadedSources.some((s) => s.url === CUSTOM_SOURCE_URL)) {
+        loadedSources.push({ url: CUSTOM_SOURCE_URL, categories: [] });
+      }
+      const customSource = loadedSources.find((s) => s.url === CUSTOM_SOURCE_URL);
+      customSource.categories = Array.from(customCategories.entries()).map(([category, symbols]) => ({
+        category,
+        symbols: Array.from(symbols)
+      }));
+    }
+
+    function addCategory() {
+      const rawCategory = prompt("New category name (example: my_watchlist)");
+      if (rawCategory == null) return;
+      const category = normalizeCategoryInput(rawCategory);
+      if (!category) {
+        sourceStatus.textContent = "Category name cannot be empty.";
+        return;
+      }
+      if (categories.some((c) => c.category === category)) {
+        sourceStatus.textContent = `Category already exists: ${category}`;
+        return;
+      }
+
+      const rawSymbols = prompt("Optional symbols (comma-separated)", "");
+      const symbols = parseSymbolsInput(rawSymbols || "");
+      customCategories.set(category, new Set(symbols));
+      ensureCustomSourceEntry();
+      removedCategories.delete(category);
+      hiddenSymbolsByCategory.delete(category);
+      activeCategoryName = category;
+      rebuildCategoriesFromSources();
+      renderSourceList();
+      renderCategoryButtons();
+      sourceStatus.textContent = `Added category: ${category}`;
+    }
+
+    function addSymbolsToActiveCategory() {
+      const cat = categories[activeCategoryIndex];
+      if (!cat) {
+        sourceStatus.textContent = "Select a category first.";
+        return;
+      }
+
+      const input = prompt(`Add symbols to ${cat.category} (comma-separated)`);
+      if (input == null) return;
+      const symbols = parseSymbolsInput(input);
+      if (!symbols.length) {
+        sourceStatus.textContent = "No symbols provided.";
+        return;
+      }
+
+      if (!customCategories.has(cat.category)) {
+        customCategories.set(cat.category, new Set(cat.symbols.map((s) => String(s).trim().toUpperCase())));
+      }
+      const customSet = customCategories.get(cat.category);
+      symbols.forEach((sym) => {
+        customSet.add(sym);
+        getHiddenSet(cat.category).delete(sym);
+      });
+
+      ensureCustomSourceEntry();
+      rebuildCategoriesFromSources();
+      renderSourceList();
+      renderCategoryButtons();
+      sourceStatus.textContent = `Added ${symbols.length} symbol(s) to ${cat.category}.`;
+    }
+
     function persistSourceUrls() {
-      localStorage.setItem("etfDataSources", JSON.stringify(loadedSources.map(s => s.url)));
+      localStorage.setItem(
+        "etfDataSources",
+        JSON.stringify(loadedSources.filter((s) => s.url !== CUSTOM_SOURCE_URL).map((s) => s.url))
+      );
     }
 
     function refreshLoadDefaultButtonState() {
@@ -871,7 +1074,7 @@
         data = await fetchSourceData(url);
       }
 
-      const parsed = data.wealthfront_explore_etfs || [];
+      const parsed = normalizePortfolioData(data);
       if (!parsed.length) throw new Error("No categories found in source");
 
       loadedSources.push({ url, categories: parsed });
@@ -883,7 +1086,28 @@
       sourceStatus.textContent = `Added. ${loadedSources.length} source(s) loaded.`;
     }
 
+    async function addLocalFileSource() {
+      const file = await new Promise((resolve, reject) => {
+        fileInput.value = "";
+        fileInput.onchange = (ev) => {
+          const picked = ev.target.files && ev.target.files[0] ? ev.target.files[0] : null;
+          if (!picked) {
+            reject(new Error("No file selected"));
+            return;
+          }
+          resolve(picked);
+        };
+        fileInput.click();
+      });
+
+      const json = await loadDataFromFile(file);
+      await addSource(`file://${file.name}`, json);
+    }
+
     function removeSource(url) {
+      if (url === CUSTOM_SOURCE_URL) {
+        customCategories.clear();
+      }
       const idx = loadedSources.findIndex(s => s.url === url);
       if (idx < 0) return;
       loadedSources.splice(idx, 1);
@@ -898,19 +1122,11 @@
     // ── Save config ───────────────────────────────────────────────────────────
 
     function buildConfigPayload() {
-      const snapshot = categories.map((cat, idx) => {
-        return { category: cat.category, etfs: getVisibleEtfs(cat.category, cat.etfs) };
+      const snapshot = categories.map((cat) => {
+        return { category: cat.category, symbols: getVisibleEtfs(cat.category, cat.symbols) };
       });
       return {
-        wealthfront_explore_etfs: snapshot,
-        market_dashboard_meta: {
-          source_urls: loadedSources.map((s) => s.url),
-          current_limit: Number.isFinite(currentLimit) ? currentLimit : "all",
-          removed_categories: Array.from(removedCategories),
-          hidden_symbols_by_category: Object.fromEntries(
-            Array.from(hiddenSymbolsByCategory.entries()).map(([k, v]) => [k, Array.from(v)])
-          )
-        }
+        portfolio: snapshot
       };
     }
 
@@ -961,7 +1177,16 @@
       } else {
         const raw = localStorage.getItem("etfDataSources");
         try { urls = raw ? JSON.parse(raw) : []; } catch { urls = []; }
-        if (!Array.isArray(urls) || !urls.length) urls = [DEFAULT_SOURCE_URL];
+        if (!Array.isArray(urls)) urls = [];
+        urls = urls.filter((url) => url !== CUSTOM_SOURCE_URL);
+      }
+
+      if (!urls.length) {
+        sourceStatus.textContent = "No data source loaded. Add a source or click Load Default Config.";
+        renderSourceList();
+        rebuildCategoriesFromSources();
+        renderCategoryButtons(true);
+        return;
       }
 
       let ok = 0;
@@ -970,11 +1195,8 @@
         catch (e) { sourceStatus.textContent = `Skipped: ${url} — ${e.message}`; }
       }
       if (!ok) {
-        try { await addSource("./wfall-01.json"); }
-        catch (e) {
-          currentCategory.textContent = "Category: Error";
-          sourceStatus.textContent = `All sources failed: ${e.message}`;
-        }
+        currentCategory.textContent = "Category: -";
+        sourceStatus.textContent = "All configured sources failed. Add a source or click Load Default Config.";
       }
     }
 
@@ -983,7 +1205,7 @@
     minus5Btn.addEventListener("click", () => {
       if (!Number.isFinite(currentLimit)) {
         const cat = categories[activeCategoryIndex];
-        currentLimit = cat ? Math.max(5, cat.etfs.length - 5) : 5;
+        currentLimit = cat ? Math.max(5, cat.symbols.length - 5) : 5;
       } else {
         currentLimit = Math.max(5, currentLimit - 5);
       }
@@ -1016,19 +1238,37 @@
     saveConfigBtn.addEventListener("click", saveConfig);
     clearConfigBtn.addEventListener("click", clearConfig);
 
-    addSourceBtn.addEventListener("click", async () => {
+    addUrlBtn.addEventListener("click", async () => {
       try {
         const url = sourceUrlInput.value.trim();
         await addSource(url);
-        if (!url.startsWith("file://")) sourceUrlInput.value = "";
+        sourceUrlInput.value = "";
+      } catch (e) {
+        sourceStatus.textContent = e.message || String(e);
+      }
+    });
+
+    addLocalFileBtn.addEventListener("click", async () => {
+      try {
+        await addLocalFileSource();
       } catch (e) {
         sourceStatus.textContent = e.message || String(e);
       }
     });
 
     sourceUrlInput.addEventListener("keydown", async (e) => {
-      if (e.key === "Enter") addSourceBtn.click();
+      if (e.key === "Enter") addUrlBtn.click();
     });
+
+    sourcesHelpBtn.addEventListener("click", () => {
+      sourcesHelpDialog.showModal();
+    });
+
+    closeSourcesHelpBtn.addEventListener("click", () => {
+      sourcesHelpDialog.close();
+    });
+
+    addSymbolsBtn.addEventListener("click", addSymbolsToActiveCategory);
 
     loadDefaultConfigBtn.addEventListener("click", async () => {
       if (loadedSources.some((s) => s.url === DEFAULT_SOURCE_URL)) {
