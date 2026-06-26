@@ -447,6 +447,7 @@
     let activeCategoryIndex = 0;
     let activeCategoryName = "";
     let currentRows = [];          // { symbol, row } of currently displayed rows
+    const rowBySymbol = new Map(); // symbol -> { symbol, row } for O(1) lookup
     let sortState = { key: "", dir: "asc" };
     let currentLimit = 5;          // replaces the old <select>; Infinity = All
     const hiddenSymbolsByCategory = new Map();
@@ -663,7 +664,7 @@
 
     function setSymbolStatus(symbol, text, textClass) {
       symbolStatusBySymbol.set(symbol, { text, textClass });
-      const rowItem = currentRows.find((r) => r.symbol === symbol);
+      const rowItem = rowBySymbol.get(symbol);
       if (rowItem) {
         rowItem.row.querySelector("td:nth-child(12)").innerHTML = statusCell(symbol, text, textClass);
       }
@@ -1016,6 +1017,7 @@
 
       currentRows[idx].row.remove();
       currentRows.splice(idx, 1);
+      rowBySymbol.delete(symbol);
       if (cat) {
         const visibleTotal = getVisibleEtfs(cat.category, cat.symbols).length;
         currentCategory.textContent =
@@ -1026,7 +1028,7 @@
     }
 
     async function refreshRow(symbol) {
-      const item = currentRows.find((r) => r.symbol === symbol);
+      const item = rowBySymbol.get(symbol);
       if (!item) return;
       try {
         setSymbolStatus(symbol, "Refreshing", "loading");
@@ -1138,13 +1140,16 @@
 
       tableBody.innerHTML = "";
       currentRows = [];
+      rowBySymbol.clear();
       currentCategory.textContent = `Category: ${titleCase(cat.category)} (${symbols.length} of ${total} ETFs)`;
       setProgress(0, symbols.length);
 
       const rowMap = new Map();
       symbols.forEach(sym => {
         const row = createRow(sym);
-        currentRows.push({ symbol: sym, row });
+        const rowItem = { symbol: sym, row };
+        currentRows.push(rowItem);
+        rowBySymbol.set(sym, rowItem);
         rowMap.set(sym, row);
       });
 
@@ -1215,7 +1220,7 @@
         try {
           const data = await fetchEtf(sym, { forceRefresh: Boolean(cached) });
           setSymbolStatus(sym, "Refreshed", "muted");
-          const rowItem = currentRows.find((r) => r.symbol === sym);
+          const rowItem = rowBySymbol.get(sym);
           if (rowItem) {
             updateRow(rowItem.row, data);
           }
