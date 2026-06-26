@@ -178,6 +178,45 @@
       gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 0.9rem;
     }
 
+    .meta-right {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .activity-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid #d3deea;
+      background: #f4f8fc;
+      color: #37566e;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 0.8rem;
+    }
+
+    .activity-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #89a3b8;
+      flex-shrink: 0;
+    }
+
+    .activity-indicator.busy .activity-dot {
+      background: #0f5b7a;
+      box-shadow: 0 0 0 0 rgba(15, 91, 122, 0.45);
+      animation: pulse 1.2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(15, 91, 122, 0.45); }
+      70% { box-shadow: 0 0 0 8px rgba(15, 91, 122, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(15, 91, 122, 0); }
+    }
+
     .category-meta {
       display: inline-flex;
       align-items: center;
@@ -313,7 +352,13 @@
           <div id="currentCategory">Category: -</div>
           <button id="addSymbolsBtn" class="btn" type="button">Add Symbols</button>
         </div>
-        <div id="progress">Loaded: 0 / 0</div>
+        <div class="meta-right">
+          <div id="progress">Loaded: 0 / 0</div>
+          <div id="activityIndicator" class="activity-indicator" aria-live="polite">
+            <span class="activity-dot"></span>
+            <span id="activityText">Idle</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -349,11 +394,30 @@
   <input id="fileInput" type="file" accept=".json" style="display:none" />
 
   <dialog id="sourcesHelpDialog" class="help-modal">
-    <h3>Manage Sources Help</h3>
-    <p>1. Use Add Url for a remote HTTP or HTTPS JSON file.</p>
-    <p>2. Use Add local file to pick a JSON file from your machine.</p>
-    <p>3. Load Default Config adds the default portfolio source URL.</p>
-    <p>Expected JSON structure:</p>
+    <h3>How to Use This Dashboard</h3>
+    <p>1. Load data first from Manage Data Sources (Add Url, Add local file, or Load Default Config).</p>
+    <p>2. Click category chips to switch groups; double-click a category chip to rename it; use + to add a custom category.</p>
+    <p>3. Use Add Symbols next to Category to append comma-separated symbols to the active category.</p>
+    <p>4. Data is cached in-memory while this page is open, and background prefetch warms uncached symbols.</p>
+    <p><strong>Buttons and actions:</strong></p>
+    <p>- -5: show five fewer rows (minimum 5).</p>
+    <p>- +5: show five more rows.</p>
+    <p>- All: show all symbols in the active category.</p>
+    <p>- Refresh: fetch only symbols that are missing key data.</p>
+    <p>- Force Refresh: fetch all symbols again from source endpoints.</p>
+    <p>- Download Config: download current categories/symbols as JSON.</p>
+    <p>- Save Config: save current config to browser cookie.</p>
+    <p>- Clear Config: clear saved cookie config.</p>
+    <p>- Load Default Config: load the built-in default portfolio URL.</p>
+    <p>- Add Url: add a remote HTTP/HTTPS JSON source.</p>
+    <p>- Add local file: import a local JSON file.</p>
+    <p>- Add Symbols: add comma-separated symbols to selected category.</p>
+    <p>- Category x: remove that category from current view.</p>
+    <p>- Row x: remove that symbol row from the active category view.</p>
+    <p>- Row refresh icon (↻): refresh only that symbol.</p>
+    <p>- ? in category strip: open this help.</p>
+    <p>- + in category strip: add a new custom category.</p>
+    <p>Expected source JSON structure:</p>
     <pre>{
   "portfolio": [
     {
@@ -388,6 +452,7 @@
     const hiddenSymbolsByCategory = new Map();
     const removedCategories = new Set();
     const customCategories = new Map();
+    const symbolStatusBySymbol = new Map();
 
     // DOM refs
     const categoryButtons   = document.getElementById("categoryButtons");
@@ -411,9 +476,13 @@
     const sourcesHelpBtn    = document.getElementById("sourcesHelpBtn");
     const sourcesHelpDialog = document.getElementById("sourcesHelpDialog");
     const closeSourcesHelpBtn = document.getElementById("closeSourcesHelpBtn");
+    const activityIndicator = document.getElementById("activityIndicator");
+    const activityText      = document.getElementById("activityText");
     const sourceStatus      = document.getElementById("sourceStatus");
     const sourceList        = document.getElementById("sourceList");
     const fileInput         = document.getElementById("fileInput");
+    let prefetchToken = 0;
+    let activityCount = 0;
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -477,6 +546,26 @@
       return Number.isFinite(currentLimit) ? Math.min(currentLimit, total) : total;
     }
 
+    function beginActivity(message) {
+      activityCount++;
+      activityIndicator.classList.add("busy");
+      activityText.textContent = message || "Working...";
+    }
+
+    function updateActivity(message) {
+      if (activityCount > 0 && message) {
+        activityText.textContent = message;
+      }
+    }
+
+    function endActivity(doneMessage) {
+      activityCount = Math.max(0, activityCount - 1);
+      if (activityCount === 0) {
+        activityIndicator.classList.remove("busy");
+        activityText.textContent = doneMessage || "Idle";
+      }
+    }
+
     function setCookie(name, value, days = 365) {
       const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
       document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/`;
@@ -510,8 +599,74 @@
       }).filter((entry) => entry.category && entry.symbols.length);
     }
 
+    function isEmptyMetric(v) {
+      return !v || v === "--";
+    }
+
+    function isMissingData(data) {
+      if (!data) return true;
+      if (!data.name || data.name === "--" || data.priceValue === null) return true;
+      if (isEmptyMetric(data.range52)) return true;
+      if (isEmptyMetric(data.oneY)) return true;
+      if (isEmptyMetric(data.threeY)) return true;
+      if (isEmptyMetric(data.fiveY)) return true;
+      if (isEmptyMetric(data.tenY)) return true;
+      return false;
+    }
+
+    function normalizeRangeBounds(data) {
+      if (!data || data.priceValue == null) return data;
+
+      let lo = Number.isFinite(data.low52) ? data.low52 : null;
+      let hi = Number.isFinite(data.high52) ? data.high52 : null;
+      if (lo === null || hi === null) return data;
+
+      if (data.priceValue < lo) lo = data.priceValue;
+      if (data.priceValue > hi) hi = data.priceValue;
+      if (hi < lo) {
+        const t = hi;
+        hi = lo;
+        lo = t;
+      }
+
+      data.low52 = lo;
+      data.high52 = hi;
+      data.range52 = `$${lo.toFixed(2)} - $${hi.toFixed(2)}`;
+      return data;
+    }
+
+    function getAllSymbolsInOrder() {
+      const seen = new Set();
+      const symbols = [];
+      categories.forEach((cat) => {
+        (cat.symbols || []).forEach((sym) => {
+          const clean = String(sym || "").trim().toUpperCase();
+          if (!clean || seen.has(clean)) return;
+          seen.add(clean);
+          symbols.push(clean);
+        });
+      });
+      return symbols;
+    }
+
     function statusCell(symbol, text, textClass) {
       return `<span class="status-wrap"><span class="${textClass}">${escapeHtml(text)}</span><button class="row-refresh" title="Refresh ${escapeHtml(symbol)}" onclick="refreshRow('${escapeHtml(symbol)}')">↻</button></span>`;
+    }
+
+    function renderSymbolStatus(symbol, fallbackText, fallbackClass) {
+      const saved = symbolStatusBySymbol.get(symbol);
+      if (saved && saved.text) {
+        return statusCell(symbol, saved.text, saved.textClass || "muted");
+      }
+      return statusCell(symbol, fallbackText, fallbackClass);
+    }
+
+    function setSymbolStatus(symbol, text, textClass) {
+      symbolStatusBySymbol.set(symbol, { text, textClass });
+      const rowItem = currentRows.find((r) => r.symbol === symbol);
+      if (rowItem) {
+        rowItem.row.querySelector("td:nth-child(12)").innerHTML = statusCell(symbol, text, textClass);
+      }
     }
 
     // ── Fidelity markdown parser ──────────────────────────────────────────────
@@ -593,7 +748,7 @@
         try {
           const res = await fetch(url, { signal: ctrl.signal });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const parsed = parseFidelityMarkdown(await res.text(), symbol);
+          const parsed = normalizeRangeBounds(parseFidelityMarkdown(await res.text(), symbol));
           cache.set(symbol, parsed);
           return parsed;
         } catch (e) {
@@ -639,7 +794,7 @@
         <td class="muted">--</td><td class="muted">--</td><td class="muted">--</td>
         <td class="muted">--</td><td class="muted">--</td><td class="muted">--</td>
         <td class="muted">--</td><td class="muted">--</td><td class="muted">--</td>
-        <td>${statusCell(symbol, "Loading", "loading")}</td>
+        <td>${renderSymbolStatus(symbol, "Loading", "loading")}</td>
         ${removeBtn(symbol)}`;
       tableBody.appendChild(tr);
       return tr;
@@ -659,18 +814,19 @@
         <td class="${valueClass(data.fiveY)}">${escapeHtml(data.fiveY || "--")}</td>
         <td class="${valueClass(data.tenY)}">${escapeHtml(data.tenY || "--")}</td>
         <td class="${valueClass(data.life)}">${escapeHtml(data.life || "--")}</td>
-        <td>${statusCell(s, "OK", "muted")}</td>
+        <td>${renderSymbolStatus(s, "OK", "muted")}</td>
         ${removeBtn(s)}`;
     }
 
     function setErrorRow(tr, symbol, err) {
+      setSymbolStatus(symbol, String(err).slice(0, 60), "error");
       tr.innerHTML = `
         <td class="symbol"><a class="cell-link" href="${fidelityUrl(symbol)}" target="_blank" rel="noreferrer">${escapeHtml(symbol)}</a></td>
         <td class="name muted">Data unavailable</td>
         <td class="muted">--</td><td class="muted">--</td><td class="muted">--</td>
         <td class="muted">--</td><td class="muted">--</td><td class="muted">--</td>
         <td class="muted">--</td><td class="muted">--</td><td class="muted">--</td>
-        <td>${statusCell(symbol, String(err).slice(0, 60), "error")}</td>
+        <td>${renderSymbolStatus(symbol, String(err).slice(0, 60), "error")}</td>
         ${removeBtn(symbol)}`;
     }
 
@@ -700,9 +856,10 @@
       const item = currentRows.find((r) => r.symbol === symbol);
       if (!item) return;
       try {
-        item.row.querySelector("td:nth-child(12)").innerHTML = statusCell(symbol, "Loading", "loading");
+        setSymbolStatus(symbol, "Refreshing", "loading");
         const data = await fetchEtf(symbol, { forceRefresh: true });
         updateRow(item.row, data);
+        setSymbolStatus(symbol, "Refreshed", "muted");
         applySortRows();
       } catch (e) {
         setErrorRow(item.row, symbol, e.message || e);
@@ -829,6 +986,82 @@
       await Promise.all(Array.from({ length: 5 }, worker));
     }
 
+    async function startBackgroundPrefetch() {
+      const token = ++prefetchToken;
+      const symbols = getAllSymbolsInOrder();
+      beginActivity("Prefetching symbols...");
+      try {
+        let done = 0;
+        for (const sym of symbols) {
+          done++;
+          if (token !== prefetchToken) return;
+          const cached = cache.get(sym);
+          if (!isMissingData(cached)) continue;
+          setSymbolStatus(sym, "Prefetching", "loading");
+          updateActivity(`Prefetching symbols... (${done}/${symbols.length})`);
+          try {
+            await fetchEtf(sym, { forceRefresh: Boolean(cached) });
+            setSymbolStatus(sym, "Prefetched", "muted");
+          } catch {
+            setSymbolStatus(sym, "Prefetch failed", "error");
+            // Keep background prefetch best-effort.
+          }
+        }
+      } finally {
+        endActivity("Idle");
+      }
+    }
+
+    async function refreshMissingSymbolsOnly() {
+      const symbols = getAllSymbolsInOrder();
+      let refreshed = 0;
+      const total = symbols.length;
+      let processed = 0;
+      for (const sym of symbols) {
+        processed++;
+        setSymbolStatus(sym, "Checking", "muted");
+        const cached = cache.get(sym);
+        if (!isMissingData(cached)) {
+          setSymbolStatus(sym, "Cached", "muted");
+          updateActivity(`Refreshing symbols... (${processed}/${total})`);
+          continue;
+        }
+
+        setSymbolStatus(sym, "Refreshing", "loading");
+
+        try {
+          const data = await fetchEtf(sym, { forceRefresh: Boolean(cached) });
+          setSymbolStatus(sym, "Refreshed", "muted");
+          const rowItem = currentRows.find((r) => r.symbol === sym);
+          if (rowItem) {
+            updateRow(rowItem.row, data);
+          }
+          refreshed++;
+          sourceStatus.textContent = `Refreshing missing symbols... (${processed}/${total})`;
+          updateActivity(`Refreshing symbols... (${processed}/${total})`);
+        } catch {
+          setSymbolStatus(sym, "Refresh failed", "error");
+          // Continue checking the rest of the symbols.
+        }
+      }
+      return refreshed;
+    }
+
+    async function forceRefreshAllSymbols() {
+      const symbols = getAllSymbolsInOrder();
+      let refreshed = 0;
+      for (const sym of symbols) {
+        try {
+          const data = await fetchEtf(sym, { forceRefresh: true });
+          cache.set(sym, normalizeRangeBounds(data));
+          refreshed++;
+        } catch {
+          // Keep force refresh best-effort across all symbols.
+        }
+      }
+      return refreshed;
+    }
+
     // ── Categories / sources ──────────────────────────────────────────────────
 
     function rebuildCategoriesFromSources() {
@@ -888,6 +1121,11 @@
           btn.classList.add("active");
           renderCategory(idx, { forceRefresh: false });
         });
+        btn.addEventListener("dblclick", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          renameCategory(item.category);
+        });
 
         const remove = document.createElement("button");
         remove.className = "cat-remove";
@@ -903,6 +1141,16 @@
         chip.appendChild(remove);
         categoryButtons.appendChild(chip);
       });
+
+      const helpChip = document.createElement("button");
+      helpChip.className = "btn icon";
+      helpChip.type = "button";
+      helpChip.title = "How to use this dashboard";
+      helpChip.textContent = "?";
+      helpChip.addEventListener("click", () => {
+        sourcesHelpDialog.showModal();
+      });
+      categoryButtons.appendChild(helpChip);
 
       const addChip = document.createElement("button");
       addChip.className = "btn icon primary";
@@ -974,6 +1222,49 @@
       renderSourceList();
       renderCategoryButtons();
       sourceStatus.textContent = `Added category: ${category}`;
+    }
+
+    function renameCategory(oldName) {
+      const raw = prompt(`Rename category '${oldName}' to:`, oldName);
+      if (raw == null) return;
+      const nextName = normalizeCategoryInput(raw);
+      if (!nextName || nextName === oldName) return;
+      if (categories.some((c) => c.category === nextName)) {
+        sourceStatus.textContent = `Category already exists: ${nextName}`;
+        return;
+      }
+
+      loadedSources.forEach((src) => {
+        src.categories.forEach((entry) => {
+          if (entry.category === oldName) entry.category = nextName;
+        });
+      });
+
+      if (customCategories.has(oldName)) {
+        const set = customCategories.get(oldName);
+        customCategories.delete(oldName);
+        customCategories.set(nextName, set);
+      }
+
+      if (hiddenSymbolsByCategory.has(oldName)) {
+        const hidden = hiddenSymbolsByCategory.get(oldName);
+        hiddenSymbolsByCategory.delete(oldName);
+        hiddenSymbolsByCategory.set(nextName, hidden);
+      }
+
+      if (removedCategories.has(oldName)) {
+        removedCategories.delete(oldName);
+        removedCategories.add(nextName);
+      }
+
+      if (activeCategoryName === oldName) {
+        activeCategoryName = nextName;
+      }
+
+      rebuildCategoriesFromSources();
+      renderSourceList();
+      renderCategoryButtons();
+      sourceStatus.textContent = `Renamed category: ${oldName} -> ${nextName}`;
     }
 
     function addSymbolsToActiveCategory() {
@@ -1084,6 +1375,7 @@
       renderCategoryButtons();
       refreshLoadDefaultButtonState();
       sourceStatus.textContent = `Added. ${loadedSources.length} source(s) loaded.`;
+      startBackgroundPrefetch();
     }
 
     async function addLocalFileSource() {
@@ -1117,6 +1409,7 @@
       renderCategoryButtons();
       refreshLoadDefaultButtonState();
       sourceStatus.textContent = `Removed. ${loadedSources.length} source(s) loaded.`;
+      startBackgroundPrefetch();
     }
 
     // ── Save config ───────────────────────────────────────────────────────────
@@ -1226,12 +1519,36 @@
       if (categories.length) renderCategory(activeCategoryIndex, { forceRefresh: false });
     });
 
-    refreshBtn.addEventListener("click", () => {
-      if (categories.length) renderCategory(activeCategoryIndex, { forceRefresh: false });
+    refreshBtn.addEventListener("click", async () => {
+      if (!categories.length) return;
+      try {
+        beginActivity("Refreshing missing symbols...");
+        sourceStatus.textContent = "Refreshing missing symbols...";
+        const refreshed = await refreshMissingSymbolsOnly();
+        applySortRows();
+        sourceStatus.textContent = refreshed
+          ? `Refreshed ${refreshed} missing symbol(s).`
+          : "No missing symbols found. Using cached data.";
+        endActivity("Refresh complete");
+      } catch (e) {
+        endActivity("Refresh failed");
+        sourceStatus.textContent = e.message || String(e);
+      }
     });
 
-    forceRefreshBtn.addEventListener("click", () => {
-      if (categories.length) renderCategory(activeCategoryIndex, { forceRefresh: true });
+    forceRefreshBtn.addEventListener("click", async () => {
+      if (!categories.length) return;
+      try {
+        beginActivity("Force refreshing all symbols...");
+        sourceStatus.textContent = "Force refreshing all symbols...";
+        const refreshed = await forceRefreshAllSymbols();
+        await renderCategory(activeCategoryIndex, { forceRefresh: false });
+        sourceStatus.textContent = `Force refresh complete (${refreshed} symbol(s) updated).`;
+        endActivity("Force refresh complete");
+      } catch (e) {
+        endActivity("Force refresh failed");
+        sourceStatus.textContent = e.message || String(e);
+      }
     });
 
     downloadConfigBtn.addEventListener("click", downloadConfig);
@@ -1285,13 +1602,20 @@
     });
 
     async function init() {
+      beginActivity("Initializing dashboard...");
       bindSorting();
       refreshSortHeaderUi();
       updateLimitDisplay();
       renderSourceList();
+      renderCategoryButtons(true);
       refreshLoadDefaultButtonState();
-      try { await initSources(); }
+      try {
+        await initSources();
+        startBackgroundPrefetch();
+        endActivity("Ready");
+      }
       catch (e) {
+        endActivity("Init failed");
         currentCategory.textContent = "Category: Error";
         progressEl.textContent = e.message || String(e);
       }
