@@ -321,6 +321,60 @@
       .meta { font-size: 0.84rem; }
       .input { min-width: 220px; }
     }
+
+    /* ── Dark theme ─────────────────────────────────────────────────────────── */
+    :root[data-theme="dark"] {
+      --bg: #0e1620;
+      --card: #15202b;
+      --text: #e6edf3;
+      --muted: #9fb0bf;
+      --accent: #4ea8d6;
+      --accent-2: #4bbd8c;
+      --warn: #e08066;
+      --line: #2a3a48;
+      --chip: #1d2b38;
+      --shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+    }
+    [data-theme="dark"] body {
+      background: radial-gradient(circle at top right, #16314a 0, #0e1620 35%),
+                  linear-gradient(180deg, #11202e 0, #0e1620 100%);
+    }
+    [data-theme="dark"] .cat-btn { color: #cfe0ee; }
+    [data-theme="dark"] .cat-btn.active { color: #06121b; }
+    [data-theme="dark"] .cat-remove { background: #3a201b; color: #f0b8aa; border-color: #5e2f25; }
+    [data-theme="dark"] .control-row label { color: #b6c6d4; }
+    [data-theme="dark"] .select,
+    [data-theme="dark"] .input,
+    [data-theme="dark"] .btn { background: #1b2735; color: #dbe7f1; }
+    [data-theme="dark"] .btn.primary { background: #14304a; border-color: #295a82; color: #cfe6ff; }
+    [data-theme="dark"] .btn.warn { background: #3a201b; border-color: #5e2f25; color: #f3b6a8; }
+    [data-theme="dark"] .btn.success { background: #163528; border-color: #245c41; color: #a7e3c4; }
+    [data-theme="dark"] .limit-display { background: #1b2735; color: #dbe7f1; }
+    [data-theme="dark"] details.sources { background: #13202c; }
+    [data-theme="dark"] details.sources summary { color: #bcd0df; }
+    [data-theme="dark"] .source-item { background: #131f2a; border-color: #2a3a48; }
+    [data-theme="dark"] .source-url { color: #aebfce; }
+    [data-theme="dark"] .remove-source { background: #3a201b; color: #f0b8aa; border-color: #5e2f25; }
+    [data-theme="dark"] .activity-indicator { background: #16242f; border-color: #2a3a48; color: #aebfce; }
+    [data-theme="dark"] .activity-dot { background: #5a7388; }
+    [data-theme="dark"] thead th { background: #16242f; color: #c4d3df; }
+    [data-theme="dark"] thead th.active-sort { background: #1d3346; color: #e8f2fb; }
+    [data-theme="dark"] tbody td { border-bottom-color: #1f2c38; }
+    [data-theme="dark"] tbody tr:hover { background: #19262f; }
+    [data-theme="dark"] tbody tr:hover td.symbol { background: #19262f; }
+    [data-theme="dark"] .symbol { color: #dbe7f1; }
+    [data-theme="dark"] .name { color: #c2d0dc; }
+    [data-theme="dark"] .loading { background: #13314a; border-color: #22507a; color: #bfe0ff; }
+    [data-theme="dark"] .error { background: #3a201b; border-color: #5e2f25; color: #f3b6a8; }
+    [data-theme="dark"] .range-line { background: linear-gradient(90deg, #2a3a48 0%, #33485a 100%); }
+    [data-theme="dark"] .range-marker { border-color: #7fb8d8; background: #0e1620; }
+    [data-theme="dark"] .range-values { color: #8da0b1; }
+    [data-theme="dark"] .row-refresh { background: #1b2735; color: #cfe0ee; border-color: #2a3a48; }
+    [data-theme="dark"] .row-remove { background: #3a201b; color: #f0b8aa; border-color: #5e2f25; }
+    [data-theme="dark"] .help-modal { background: #15202b; color: #dbe7f1; }
+    [data-theme="dark"] .help-modal h3 { color: #e6edf3; }
+    [data-theme="dark"] .help-modal p { color: #c2d0dc; }
+    [data-theme="dark"] .help-modal pre { background: #0f1923; border-color: #2a3a48; color: #c8d6e2; }
   </style>
 </head>
 <body>
@@ -343,6 +397,7 @@
         <button id="downloadConfigBtn" class="btn success" type="button">Download Config</button>
         <button id="saveConfigBtn" class="btn success" type="button">Save Config</button>
         <button id="clearConfigBtn" class="btn" type="button">Clear Config</button>
+        <button id="themeToggleBtn" class="btn" type="button" title="Toggle dark mode" aria-label="Toggle dark mode">🌙</button>
       </div>
 
       <details class="sources">
@@ -481,6 +536,7 @@
     const downloadConfigBtn = document.getElementById("downloadConfigBtn");
     const saveConfigBtn     = document.getElementById("saveConfigBtn");
     const clearConfigBtn    = document.getElementById("clearConfigBtn");
+    const themeToggleBtn    = document.getElementById("themeToggleBtn");
     const sourceUrlInput    = document.getElementById("sourceUrlInput");
     const addUrlBtn         = document.getElementById("addUrlBtn");
     const addLocalFileBtn   = document.getElementById("addLocalFileBtn");
@@ -496,6 +552,33 @@
     const fileInput         = document.getElementById("fileInput");
     let prefetchToken = 0;
     let activityCount = 0;
+
+    // ── Theme (light/dark) ─────────────────────────────────────────────────────
+
+    const THEME_KEY = "dashTheme";
+
+    function applyTheme(theme) {
+      const dark = theme === "dark";
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+      themeToggleBtn.textContent = dark ? "☀️" : "🌙";
+      themeToggleBtn.title = dark ? "Switch to light mode" : "Switch to dark mode";
+    }
+
+    function initTheme() {
+      let saved = null;
+      try { saved = localStorage.getItem(THEME_KEY); } catch { /* ignore */ }
+      const prefersDark = window.matchMedia &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches;
+      applyTheme(saved || (prefersDark ? "dark" : "light"));
+    }
+
+    themeToggleBtn.addEventListener("click", () => {
+      const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      applyTheme(next);
+      try { localStorage.setItem(THEME_KEY, next); } catch { /* ignore */ }
+    });
+
+    initTheme();
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
