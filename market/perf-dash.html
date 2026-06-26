@@ -1102,8 +1102,12 @@
     function refreshSortHeaderUi() {
       document.querySelectorAll("thead th[data-sort-key]").forEach(th => {
         const arrow = th.querySelector(".sort-arrow");
-        th.classList.toggle("active-sort", th.dataset.sortKey === sortState.key);
-        if (arrow) arrow.textContent = th.dataset.sortKey === sortState.key
+        const isActive = th.dataset.sortKey === sortState.key;
+        th.classList.toggle("active-sort", isActive);
+        th.setAttribute("aria-sort", isActive
+          ? (sortState.dir === "asc" ? "ascending" : "descending")
+          : "none");
+        if (arrow) arrow.textContent = isActive
           ? (sortState.dir === "asc" ? "▲" : "▼") : "";
       });
     }
