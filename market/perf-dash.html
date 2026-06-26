@@ -96,6 +96,7 @@
       background: #fff; color: #1e3447; font-size: 0.85rem; padding: 6px 9px;
     }
     .input { min-width: 420px; max-width: 70vw; }
+    .filter-input { min-width: 150px; max-width: 220px; }
     .btn { cursor: pointer; background: #f8fbff; }
     .btn.primary { background: #e8f4ff; border-color: #b8d8f3; }
     .btn.warn { background: #fff3ef; border-color: #f2c6bb; color: #7a2f20; }
@@ -327,6 +328,7 @@
         <span id="limitDisplay" class="limit-display">5</span>
         <button id="plus5Btn" class="btn" type="button" title="Show 5 more rows">+5</button>
         <button id="allBtn" class="btn" type="button">All</button>
+        <input id="filterInput" class="input filter-input" type="search" placeholder="Filter symbol/name…" aria-label="Filter displayed symbols" />
         <button id="refreshBtn" class="btn primary" type="button">Refresh</button>
         <button id="forceRefreshBtn" class="btn warn" type="button">Force Refresh</button>
         <button id="downloadConfigBtn" class="btn success" type="button">Download Config</button>
@@ -464,6 +466,7 @@
     const minus5Btn         = document.getElementById("minus5Btn");
     const plus5Btn          = document.getElementById("plus5Btn");
     const allBtn            = document.getElementById("allBtn");
+    const filterInput       = document.getElementById("filterInput");
     const refreshBtn        = document.getElementById("refreshBtn");
     const forceRefreshBtn   = document.getElementById("forceRefreshBtn");
     const downloadConfigBtn = document.getElementById("downloadConfigBtn");
@@ -668,6 +671,18 @@
       if (rowItem) {
         rowItem.row.querySelector("td:nth-child(12)").innerHTML = statusCell(symbol, text, textClass);
       }
+    }
+
+    // Hide displayed rows whose symbol or name doesn't match the filter query.
+    function applyRowFilter() {
+      const q = (filterInput.value || "").trim().toLowerCase();
+      currentRows.forEach(({ symbol, row }) => {
+        if (!q) { row.style.display = ""; return; }
+        const nameCell = row.querySelector("td.name");
+        const name = nameCell ? nameCell.textContent.toLowerCase() : "";
+        const match = symbol.toLowerCase().includes(q) || name.includes(q);
+        row.style.display = match ? "" : "none";
+      });
     }
 
     // ── Fidelity markdown parser ──────────────────────────────────────────────
@@ -1157,6 +1172,7 @@
       });
 
       applySortRows();
+      applyRowFilter();
 
       let done = 0;
       await runPool(symbols, FETCH_CONCURRENCY, async (sym) => {
@@ -1173,6 +1189,7 @@
         done++;
         setProgress(done, symbols.length);
         applySortRows();
+        applyRowFilter();
       });
     }
 
@@ -1708,6 +1725,8 @@
       updateLimitDisplay();
       if (categories.length) renderCategory(activeCategoryIndex, { forceRefresh: false });
     });
+
+    filterInput.addEventListener("input", applyRowFilter);
 
     refreshBtn.addEventListener("click", async () => {
       if (!categories.length) return;
