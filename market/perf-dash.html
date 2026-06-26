@@ -735,29 +735,202 @@
       };
     }
 
-    // ── Fetch with retry ─────────────────────────────────────────────────────
+    // ── Reader providers & rate limiting ──────────────────────────────────────
+
+    // Persistent on-disk cache so reloads / refreshes don't re-hit the network.
+    const CACHE_TTL_MS = 12 * 60 * 60 * 1000;      // treat cached quotes as fresh for 12h
+    const PERSIST_CACHE_KEY = "etfQuoteCache";
+    const cacheTime = new Map();                    // symbol -> epoch ms of last successful fetch
+
+    // Politeness controls so we never hammer any single service.
+    const FETCH_CONCURRENCY = 3;                    // max simultaneous in-flight requests
+    const REQUEST_MIN_INTERVAL_MS = 300;            // min spacing between request starts
+    const FETCH_TIMEOUT_MS = 25000;
+
+    // Reader providers. Requests round-robin across every ENABLED provider and
+    // fail over to the next one on error — this spreads load and adds
+    // resilience. A provider MUST return Jina-style *markdown* that
+    // parseFidelityMarkdown() can read.
+    //
+    //   Free, no key:   Jina Reader (r.jina.ai) — the only free hosted reader.
+    //   Free, self-run: Jina Reader self-hosted (github.com/jina-ai/reader) —
+    //                   deploy several instances to genuinely distribute load.
+    //   Keyed markdown: Firecrawl (firecrawl.dev, markdown mode).
+    //
+    // Deliberately NOT included: generic CORS proxies (corsproxy.io,
+    // api.allorigins.win, thingproxy, api.codetabs.com) and HTML scrapers
+    // (ScraperAPI, ScrapingBee, ZenRows, Scrapfly, ScrapingAnt). Fidelity
+    // renders quotes with JavaScript, so proxies return an empty shell and
+    // scrapers return raw HTML this markdown parser cannot read — they'd each
+    // need a separate HTML parser to be useful.
+    const READER_PROVIDERS = [
+      {
+        id: "jina",
+        label: "Jina Reader",
+        enabled: true,
+        build: (target) => `https://r.jina.ai/${target}`,
+        headers: () => ({ "X-Return-Format": "markdown" }),
+      },
+      // Add your own Jina instances to load-balance for real (set enabled:true):
+      // { id: "jina-2", label: "Jina (self-host A)", enabled: false,
+      //   build: (t) => `https://reader-a.example.com/${t}` },
+      // { id: "jina-3", label: "Jina (self-host B)", enabled: false,
+      //   build: (t) => `https://reader-b.example.com/${t}` },
+
+      // Firecrawl (markdown mode) — set key + enabled:true to join the rotation:
+      {
+        id: "firecrawl",
+        label: "Firecrawl",
+        enabled: false,
+        key: "",
+        fetchText: async function (target, signal) {
+          const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
+            method: "POST",
+            signal,
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${this.key}`,
+            },
+            body: JSON.stringify({ url: target, formats: ["markdown"] }),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const json = await res.json();
+          return (json && json.data && json.data.markdown) || "";
+        },
+      },
+    ];
+
+    function enabledProviders() {
+      return READER_PROVIDERS.filter((p) => p.enabled && (!("key" in p) || p.key));
+    }
+
+    let providerCursor = 0;
+
+    // Global rate limiter: spaces out request start times.
+    let nextSlotAt = 0;
+    function throttle() {
+      const now = Date.now();
+      const startAt = Math.max(now, nextSlotAt);
+      nextSlotAt = startAt + REQUEST_MIN_INTERVAL_MS;
+      const wait = startAt - now;
+      return wait > 0 ? new Promise((r) => setTimeout(r, wait)) : Promise.resolve();
+    }
+
+    function loadPersistentCache() {
+      try {
+        const raw = localStorage.getItem(PERSIST_CACHE_KEY);
+        if (!raw) return;
+        const obj = JSON.parse(raw);
+        const now = Date.now();
+        Object.keys(obj).forEach((sym) => {
+          const entry = obj[sym];
+          if (entry && entry.t && entry.d && (now - entry.t) < CACHE_TTL_MS) {
+            cache.set(sym, entry.d);
+            cacheTime.set(sym, entry.t);
+          }
+        });
+      } catch {
+        // Corrupt cache is non-fatal; ignore.
+      }
+    }
+
+    let persistTimer = null;
+    function persistCacheSoon() {
+      if (persistTimer) return;
+      persistTimer = setTimeout(() => {
+        persistTimer = null;
+        try {
+          const obj = {};
+          cache.forEach((d, sym) => {
+            obj[sym] = { t: cacheTime.get(sym) || Date.now(), d };
+          });
+          localStorage.setItem(PERSIST_CACHE_KEY, JSON.stringify(obj));
+        } catch {
+          // Storage full/unavailable — keep running with the in-memory cache.
+        }
+      }, 800);
+    }
+
+    function isCacheFresh(symbol) {
+      const t = cacheTime.get(symbol);
+      return Boolean(t) && (Date.now() - t) < CACHE_TTL_MS;
+    }
+
+    function looksUnparseable(d) {
+      return !d || !d.name || d.name === "--" || d.priceValue == null;
+    }
+
+    // ── Fetch with provider rotation, failover & retry ────────────────────────
+
+    async function fetchProviderText(provider, target, signal) {
+      if (typeof provider.fetchText === "function") {
+        return provider.fetchText(target, signal);
+      }
+      const res = await fetch(provider.build(target, provider.key), {
+        signal,
+        headers: provider.headers ? provider.headers() : undefined,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.text();
+    }
 
     async function fetchEtf(symbol, options = {}) {
       const { forceRefresh = false } = options;
-      if (!forceRefresh && cache.has(symbol)) return cache.get(symbol);
+      if (!forceRefresh && cache.has(symbol) && isCacheFresh(symbol)) {
+        return cache.get(symbol);
+      }
 
-      const url = `https://r.jina.ai/http://digital.fidelity.com/prgw/digital/research/quote/dashboard/summary?symbol=${encodeURIComponent(symbol)}`;
-      for (let attempt = 1; attempt <= 3; attempt++) {
+      const target = `http://digital.fidelity.com/prgw/digital/research/quote/dashboard/summary?symbol=${encodeURIComponent(symbol)}`;
+      const providers = enabledProviders();
+      if (!providers.length) throw new Error("No reader providers enabled");
+
+      // Start the rotation at a different provider each call (load balancing).
+      const startIdx = providerCursor++ % providers.length;
+      const maxAttempts = Math.max(3, providers.length);
+      let lastErr;
+
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const provider = providers[(startIdx + attempt) % providers.length];
+        await throttle();
         const ctrl = new AbortController();
-        const tid  = setTimeout(() => ctrl.abort(), 25000);
+        const tid  = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
         try {
-          const res = await fetch(url, { signal: ctrl.signal });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const parsed = normalizeRangeBounds(parseFidelityMarkdown(await res.text(), symbol));
+          const text   = await fetchProviderText(provider, target, ctrl.signal);
+          const parsed = normalizeRangeBounds(parseFidelityMarkdown(text, symbol));
+          if (looksUnparseable(parsed)) throw new Error("Empty/unreadable response");
           cache.set(symbol, parsed);
+          cacheTime.set(symbol, Date.now());
+          persistCacheSoon();
           return parsed;
         } catch (e) {
-          if (attempt === 3) throw e;
-          await new Promise(r => setTimeout(r, 500 * attempt));
+          lastErr = e;
+          // Back off only after cycling through every provider once.
+          const cycled = (attempt + 1) % providers.length === 0;
+          if (cycled && attempt < maxAttempts - 1) {
+            await new Promise((r) => setTimeout(r, 500 * Math.ceil((attempt + 1) / providers.length)));
+          }
         } finally {
           clearTimeout(tid);
         }
       }
+      throw lastErr || new Error("All providers failed");
+    }
+
+    // ── Concurrency pool ──────────────────────────────────────────────────────
+
+    // Runs `worker(item, index)` over `items` with at most `concurrency`
+    // tasks in flight at once. Network-bound work (symbol fetches) runs far
+    // faster this way than awaiting one item at a time.
+    async function runPool(items, concurrency, worker) {
+      let cursor = 0;
+      const limit = Math.max(1, Math.min(concurrency, items.length));
+      async function runner() {
+        while (cursor < items.length) {
+          const index = cursor++;
+          await worker(items[index], index);
+        }
+      }
+      await Promise.all(Array.from({ length: limit }, runner));
     }
 
     // ── Range line rendering ─────────────────────────────────────────────────
@@ -888,9 +1061,13 @@
     function applySortRows() {
       if (!sortState.key || !currentRows.length) return;
       const dir = sortState.dir === "asc" ? 1 : -1;
+      // Precompute each row's sort value once instead of recomputing it on
+      // every comparison (the comparator runs O(n log n) times).
+      const valBySymbol = new Map();
+      currentRows.forEach(r => valBySymbol.set(r.symbol, getSortValue(r.symbol, sortState.key)));
       currentRows.sort((a, b) => {
-        const va = getSortValue(a.symbol, sortState.key);
-        const vb = getSortValue(b.symbol, sortState.key);
+        const va = valBySymbol.get(a.symbol);
+        const vb = valBySymbol.get(b.symbol);
         if (va === null && vb === null) return a.symbol.localeCompare(b.symbol);
         if (va === null) return 1;
         if (vb === null) return -1;
@@ -963,27 +1140,21 @@
       applySortRows();
 
       let done = 0;
-      const queue = [...symbols];
-
-      async function worker() {
-        while (queue.length) {
-          const sym = queue.shift();
-          if (!sym || token !== renderToken) return;
-          const row = rowMap.get(sym);
-          try {
-            const data = await fetchEtf(sym, { forceRefresh });
-            if (token !== renderToken) return;
-            updateRow(row, data);
-          } catch (e) {
-            if (token !== renderToken) return;
-            setErrorRow(row, sym, e.message || e);
-          }
-          done++;
-          setProgress(done, symbols.length);
-          applySortRows();
+      await runPool(symbols, FETCH_CONCURRENCY, async (sym) => {
+        if (token !== renderToken) return;
+        const row = rowMap.get(sym);
+        try {
+          const data = await fetchEtf(sym, { forceRefresh });
+          if (token !== renderToken) return;
+          updateRow(row, data);
+        } catch (e) {
+          if (token !== renderToken) return;
+          setErrorRow(row, sym, e.message || e);
         }
-      }
-      await Promise.all(Array.from({ length: 5 }, worker));
+        done++;
+        setProgress(done, symbols.length);
+        applySortRows();
+      });
     }
 
     async function startBackgroundPrefetch() {
@@ -992,21 +1163,22 @@
       beginActivity("Prefetching symbols...");
       try {
         let done = 0;
-        for (const sym of symbols) {
-          done++;
+        await runPool(symbols, FETCH_CONCURRENCY, async (sym) => {
           if (token !== prefetchToken) return;
+          done++;
           const cached = cache.get(sym);
-          if (!isMissingData(cached)) continue;
+          if (!isMissingData(cached)) return;
           setSymbolStatus(sym, "Prefetching", "loading");
           updateActivity(`Prefetching symbols... (${done}/${symbols.length})`);
           try {
             await fetchEtf(sym, { forceRefresh: Boolean(cached) });
+            if (token !== prefetchToken) return;
             setSymbolStatus(sym, "Prefetched", "muted");
           } catch {
             setSymbolStatus(sym, "Prefetch failed", "error");
             // Keep background prefetch best-effort.
           }
-        }
+        });
       } finally {
         endActivity("Idle");
       }
@@ -1017,14 +1189,14 @@
       let refreshed = 0;
       const total = symbols.length;
       let processed = 0;
-      for (const sym of symbols) {
+      await runPool(symbols, FETCH_CONCURRENCY, async (sym) => {
         processed++;
         setSymbolStatus(sym, "Checking", "muted");
         const cached = cache.get(sym);
         if (!isMissingData(cached)) {
           setSymbolStatus(sym, "Cached", "muted");
           updateActivity(`Refreshing symbols... (${processed}/${total})`);
-          continue;
+          return;
         }
 
         setSymbolStatus(sym, "Refreshing", "loading");
@@ -1043,22 +1215,21 @@
           setSymbolStatus(sym, "Refresh failed", "error");
           // Continue checking the rest of the symbols.
         }
-      }
+      });
       return refreshed;
     }
 
     async function forceRefreshAllSymbols() {
       const symbols = getAllSymbolsInOrder();
       let refreshed = 0;
-      for (const sym of symbols) {
+      await runPool(symbols, FETCH_CONCURRENCY, async (sym) => {
         try {
-          const data = await fetchEtf(sym, { forceRefresh: true });
-          cache.set(sym, normalizeRangeBounds(data));
+          await fetchEtf(sym, { forceRefresh: true });
           refreshed++;
         } catch {
           // Keep force refresh best-effort across all symbols.
         }
-      }
+      });
       return refreshed;
     }
 
@@ -1603,6 +1774,7 @@
 
     async function init() {
       beginActivity("Initializing dashboard...");
+      loadPersistentCache();
       bindSorting();
       refreshSortHeaderUi();
       updateLimitDisplay();
