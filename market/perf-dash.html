@@ -248,6 +248,15 @@
     }
     tbody tr:hover { background: #f7fbff; }
 
+    /* Keep the symbol column visible while scrolling horizontally */
+    thead th:first-child {
+      left: 0; z-index: 3;
+    }
+    tbody td.symbol {
+      position: sticky; left: 0; z-index: 1; background: var(--card);
+    }
+    tbody tr:hover td.symbol { background: #f7fbff; }
+
     .symbol { font-weight: 700; color: #1f3448; letter-spacing: 0.02em; }
     .name { max-width: 320px; white-space: normal; line-height: 1.25; color: #2a3d4f; }
 
