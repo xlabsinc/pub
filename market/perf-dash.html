@@ -134,7 +134,8 @@
 
     .provider-note { font-size: 0.78rem; color: var(--muted); margin: 8px 0 4px; line-height: 1.35; }
     .provider-toggle { display: inline-flex; align-items: center; gap: 8px; flex: 1; cursor: pointer; }
-    .provider-key { min-width: 150px; max-width: 240px; }
+    .provider-key { min-width: 450px; max-width: 720px; width: min(55vw, 720px); }
+    .provider-key-wrap { display: inline-flex; align-items: center; gap: 6px; }
 
     .help-modal {
       border: 1px solid var(--line);
@@ -435,6 +436,7 @@
         <div class="control-row" style="margin-top:8px;">
           <input id="providerLabelInput" class="input filter-input" type="text" placeholder="Label (optional)" />
           <input id="providerUrlInput" class="input" type="text" placeholder="Self-hosted Jina base URL (https://reader.example.com)" />
+          <input id="providerApiKeyInput" class="input provider-key" type="password" placeholder="API key (optional)" />
           <button id="addProviderBtn" class="btn primary" type="button">Add Provider</button>
           <span id="providerStatus" class="source-status"></span>
         </div>
@@ -595,6 +597,7 @@
     const providerList      = document.getElementById("providerList");
     const providerLabelInput = document.getElementById("providerLabelInput");
     const providerUrlInput  = document.getElementById("providerUrlInput");
+    const providerApiKeyInput = document.getElementById("providerApiKeyInput");
     const addProviderBtn    = document.getElementById("addProviderBtn");
     const providerStatus    = document.getElementById("providerStatus");
     const fileInput         = document.getElementById("fileInput");
@@ -978,8 +981,12 @@
         id: "jina",
         label: "Jina Reader",
         enabled: true,
+        key: "",
         build: (target) => `https://r.jina.ai/${target}`,
-        headers: () => ({ "X-Return-Format": "markdown" }),
+        headers: (key) => ({
+          "X-Return-Format": "markdown",
+          ...(key ? { "Authorization": `Bearer ${key}` } : {}),
+        }),
       },
       // Add your own Jina instances to load-balance for real (set enabled:true):
       // { id: "jina-2", label: "Jina (self-host A)", enabled: false,
@@ -992,6 +999,7 @@
         id: "firecrawl",
         label: "Firecrawl",
         enabled: false,
+        requiresKey: true,
         key: "",
         fetchText: async function (target, signal) {
           const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
@@ -1011,7 +1019,9 @@
     ];
 
     function enabledProviders() {
-      return READER_PROVIDERS.filter((p) => p.enabled && (!("key" in p) || p.key));
+      return READER_PROVIDERS.filter((p) =>
+        p.enabled && (!p.requiresKey || (typeof p.key === "string" && p.key.trim()))
+      );
     }
 
     // ── Provider settings (persisted, user-managed) ───────────────────────────
@@ -1019,15 +1029,22 @@
     const PROVIDER_SETTINGS_KEY = "readerProviders";
     let customProviderSeq = 0;
 
-    function addCustomProvider({ id, label, base, enabled = true }, persist = true) {
+    function addCustomProvider({ id, label, base, key = "", enabled = true }, persist = true) {
       if (!base) return null;
       const provider = {
         id: id || `custom-${++customProviderSeq}`,
         label: label || base,
         base,
+        key: String(key || "").trim(),
         custom: true,
         enabled: Boolean(enabled),
         build: function (t) { return `${String(this.base).replace(/\/+$/, "")}/${t}`; },
+        headers: function (k) {
+          return {
+            "X-Return-Format": "markdown",
+            ...(k ? { "Authorization": `Bearer ${k}` } : {}),
+          };
+        },
       };
       const n = parseInt(String(provider.id).replace(/\D/g, ""), 10);
       if (Number.isFinite(n) && n > customProviderSeq) customProviderSeq = n;
@@ -1053,7 +1070,7 @@
       const obj = { custom: [] };
       READER_PROVIDERS.forEach((p) => {
         if (p.custom) {
-          obj.custom.push({ id: p.id, label: p.label, base: p.base, enabled: p.enabled });
+          obj.custom.push({ id: p.id, label: p.label, base: p.base, key: p.key || "", enabled: p.enabled });
         } else {
           obj[p.id] = { enabled: p.enabled };
           if ("key" in p) obj[p.id].key = p.key || "";
@@ -1077,19 +1094,58 @@
         cb.addEventListener("change", () => { p.enabled = cb.checked; saveProviderSettings(); });
         const name = document.createElement("span");
         name.className = "source-url";
-        name.textContent = p.custom ? `${p.label} — ${p.base}`
-          : ("key" in p ? `${p.label} (API key)` : `${p.label} (free)`);
+        if (p.id === "jina") {
+          const link = document.createElement("a");
+          link.className = "cell-link";
+          link.href = "https://jina.ai/reader/";
+          link.target = "_blank";
+          link.rel = "noreferrer";
+          link.textContent = "Jina Reader (API key optional)";
+          name.appendChild(link);
+        } else if (p.id === "firecrawl") {
+          const link = document.createElement("a");
+          link.className = "cell-link";
+          link.href = "https://www.firecrawl.dev/";
+          link.target = "_blank";
+          link.rel = "noreferrer";
+          link.textContent = "Firecrawl (API key required)";
+          name.appendChild(link);
+        } else {
+          name.textContent = p.custom ? `${p.label} — ${p.base}`
+            : ("key" in p
+              ? `${p.label} (${p.requiresKey ? "API key required" : "API key optional"})`
+              : `${p.label} (free)`);
+        }
         toggle.append(cb, name);
         li.appendChild(toggle);
 
         if ("key" in p) {
+          const keyWrap = document.createElement("div");
+          keyWrap.className = "provider-key-wrap";
+
           const keyInput = document.createElement("input");
           keyInput.type = "password";
           keyInput.className = "input provider-key";
           keyInput.placeholder = "API key";
           keyInput.value = p.key || "";
           keyInput.addEventListener("change", () => { p.key = keyInput.value.trim(); saveProviderSettings(); });
-          li.appendChild(keyInput);
+
+          const eyeBtn = document.createElement("button");
+          eyeBtn.type = "button";
+          eyeBtn.className = "btn icon";
+          eyeBtn.title = `Show ${p.label} API key`;
+          eyeBtn.setAttribute("aria-label", `Show ${p.label} API key`);
+          eyeBtn.textContent = "👁";
+          eyeBtn.addEventListener("click", () => {
+            const show = keyInput.type === "password";
+            keyInput.type = show ? "text" : "password";
+            eyeBtn.textContent = show ? "🙈" : "👁";
+            eyeBtn.title = `${show ? "Hide" : "Show"} ${p.label} API key`;
+            eyeBtn.setAttribute("aria-label", `${show ? "Hide" : "Show"} ${p.label} API key`);
+          });
+
+          keyWrap.append(keyInput, eyeBtn);
+          li.appendChild(keyWrap);
         }
 
         if (p.custom) {
@@ -1178,7 +1234,7 @@
       }
       const res = await fetch(provider.build(target, provider.key), {
         signal,
-        headers: provider.headers ? provider.headers() : undefined,
+        headers: provider.headers ? provider.headers(provider.key) : undefined,
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.text();
@@ -2124,13 +2180,15 @@
     addProviderBtn.addEventListener("click", () => {
       const label = providerLabelInput.value.trim();
       const base = providerUrlInput.value.trim();
+      const key = providerApiKeyInput.value.trim();
       if (!/^https?:\/\//i.test(base)) {
         providerStatus.textContent = "Enter a base URL starting with http(s)://";
         return;
       }
-      addCustomProvider({ label, base, enabled: true });
+      addCustomProvider({ label, base, key, enabled: true });
       providerLabelInput.value = "";
       providerUrlInput.value = "";
+      providerApiKeyInput.value = "";
       providerStatus.textContent = "Provider added.";
       renderProviderList();
     });
