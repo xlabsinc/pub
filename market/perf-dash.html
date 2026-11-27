@@ -886,9 +886,26 @@
 
     function parseFidelityMarkdown(md, symbol) {
       const name      = extractRegex(md, /^Title:\s*[A-Z0-9.\-]+\s*-\s*(.+?)\s*\|/m);
-      const price     = extractRegex(md, /\n\$(\d[\d,]*\.\d{2})\n\n[A-Z]{2,5}\b/m, 1);
-      const change    = extractRegex(md, /\n\s*([+-]\d[\d,]*\.\d{2})\s*\n\n\s*\(([+-]\d+(?:\.\d+)?%)\)/m, 1);
-      const pctChange = extractRegex(md, /\n\s*([+-]\d[\d,]*\.\d{2})\s*\n\n\s*\(([+-]\d+(?:\.\d+)?%)\)/m, 2);
+      let price       = extractRegex(md, /\n\$(\d[\d,]*\.\d{2})\n\n[A-Z]{2,5}\b/m, 1);
+      let change      = extractRegex(md, /\n\s*([+-]\d[\d,]*\.\d{2})\s*\n\n\s*\(([+-]\d+(?:\.\d+)?%)\)/m, 1);
+      let pctChange   = extractRegex(md, /\n\s*([+-]\d[\d,]*\.\d{2})\s*\n\n\s*\(([+-]\d+(?:\.\d+)?%)\)/m, 2);
+
+      // Stocks often render quote lines differently than ETFs/funds, so keep a
+      // looser fallback parser over the header block.
+      if (price === "--" || change === "--" || pctChange === "--") {
+        const head = md.slice(0, 2200);
+        if (price === "--") {
+          const pm = head.match(/\$([0-9][\d,]*\.\d{2})(?!\d)/);
+          if (pm && pm[1]) price = pm[1];
+        }
+        if (change === "--" || pctChange === "--") {
+          const cm = head.match(/([+-]\d[\d,]*\.\d{2})\s*\(([+-]\d+(?:\.\d+)?%)\)/);
+          if (cm) {
+            if (change === "--") change = cm[1];
+            if (pctChange === "--") pctChange = cm[2];
+          }
+        }
+      }
 
       const rangeSection = extractRegex(
         md,
@@ -1237,7 +1254,11 @@
         headers: provider.headers ? provider.headers(provider.key) : undefined,
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.text();
+      const text = await res.text();
+      if (provider.id === "jina" && /AuthenticationRequiredError/i.test(text)) {
+        throw new Error("Jina requires authentication from this network. Add a Jina API key in Reader Providers.");
+      }
+      return text;
     }
 
     async function fetchEtf(symbol, options = {}) {
