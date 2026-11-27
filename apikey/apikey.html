@@ -50,6 +50,14 @@
             font-size: 14px;
         }
 
+        #urlPrefillNotice {
+            padding: 12px;
+            margin-bottom: 15px;
+            background-color: #eef7ee;
+            border-left: 4px solid #4CAF50;
+            border-radius: 4px;
+        }
+
         label {
             display: block;
             margin-bottom: 6px;
@@ -134,6 +142,8 @@
         <option value="decrypt">Decrypt</option>
     </select>
 
+    <p id="urlPrefillNotice" role="status" hidden>Encrypted text loaded from the URL. Enter the password and click Submit to decrypt it.</p>
+
     <label for="fileInput">Upload a File:</label>
     <input type="file" id="fileInput" />
 
@@ -153,6 +163,12 @@
 
     <button onclick="saveOutput()">Save Output</button>
     <button onclick="copyToClipboard()">Copy to Clipboard</button>
+
+    <div id="shareUrlContainer" hidden>
+        <label for="shareUrl">Shareable URL (encrypted text in the URL fragment):</label>
+        <textarea id="shareUrl" readonly placeholder="Shareable URL will be displayed here..."></textarea>
+        <button onclick="copyShareUrl()">Copy Shareable URL</button>
+    </div>
 </div>
 
 <script>
@@ -408,6 +424,8 @@
         const password = document.getElementById('password').value;
         const mode = document.getElementById('modeSelect').value;
 
+        clearShareUrl();
+
         if (!inputText) {
             alert('Please enter text to process');
             return;
@@ -424,6 +442,7 @@
             if (mode === 'encrypt') {
                 const encrypted = encryptSecret(inputText, password);
                 resultText = formatHexOutput(encrypted);
+                showShareUrl(resultText);
             } else {
                 const decrypted = decryptSecret(inputText, password);
                 if (!decrypted) {
@@ -439,6 +458,54 @@
         const output = document.getElementById('outputText');
         output.value = resultText;
         autoResizeTextarea(output);
+    }
+
+    function showShareUrl(encryptedText) {
+        const shareUrl = document.getElementById('shareUrl');
+        shareUrl.value = window.location.href.split('#')[0] + '#' + encodeURIComponent(encryptedText);
+        document.getElementById('shareUrlContainer').hidden = false;
+        autoResizeTextarea(shareUrl);
+    }
+
+    function clearShareUrl() {
+        document.getElementById('shareUrl').value = '';
+        document.getElementById('shareUrlContainer').hidden = true;
+    }
+
+    function copyShareUrl() {
+        const shareUrl = document.getElementById('shareUrl').value;
+        if (!shareUrl) {
+            alert('No shareable URL to copy');
+            return;
+        }
+        navigator.clipboard.writeText(shareUrl).then(() => {
+            alert('Shareable URL copied to clipboard!');
+        }).catch(err => {
+            alert('Failed to copy: ' + err);
+        });
+    }
+
+    function prefillFromUrl() {
+        const encodedText = window.location.hash.slice(1);
+        if (!encodedText) return;
+
+        let encryptedText;
+        try {
+            encryptedText = decodeURIComponent(encodedText);
+        } catch (error) {
+            console.error('Unable to decode encrypted text from URL fragment:', error);
+            alert('The encrypted text in the URL fragment is invalid.');
+            return;
+        }
+
+        if (!encryptedText) return;
+
+        document.getElementById('modeSelect').value = 'decrypt';
+        const input = document.getElementById('inputText');
+        input.value = encryptedText;
+        autoResizeTextarea(input);
+        document.getElementById('urlPrefillNotice').hidden = false;
+        document.getElementById('password').focus();
     }
 
     function togglePasswordVisibility() {
@@ -512,6 +579,8 @@
 
     // File upload
     document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+
+    prefillFromUrl();
 </script>
 
 </body>
