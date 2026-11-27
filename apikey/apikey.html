@@ -442,7 +442,7 @@
             if (mode === 'encrypt') {
                 const encrypted = encryptSecret(inputText, password);
                 resultText = formatHexOutput(encrypted);
-                showShareUrl(resultText);
+                showShareUrl(encrypted);
             } else {
                 const decrypted = decryptSecret(inputText, password);
                 if (!decrypted) {
@@ -460,9 +460,9 @@
         autoResizeTextarea(output);
     }
 
-    function showShareUrl(encryptedText) {
+    function showShareUrl(rawCiphertext) {
         const shareUrl = document.getElementById('shareUrl');
-        shareUrl.value = window.location.href.split('#')[0] + '#' + encodeURIComponent(encryptedText);
+        shareUrl.value = window.location.href.split('#')[0] + '#' + encodeURIComponent(rawCiphertext);
         document.getElementById('shareUrlContainer').hidden = false;
         autoResizeTextarea(shareUrl);
     }
@@ -502,7 +502,10 @@
 
         document.getElementById('modeSelect').value = 'decrypt';
         const input = document.getElementById('inputText');
-        input.value = encryptedText;
+        const hasXxdOffsets = /^[0-9A-Fa-f]{8}:\s/.test(encryptedText);
+        input.value = hasXxdOffsets
+            ? encryptedText
+            : formatHexOutput(encryptedText);
         autoResizeTextarea(input);
         document.getElementById('urlPrefillNotice').hidden = false;
         document.getElementById('password').focus();
